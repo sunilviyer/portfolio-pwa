@@ -322,15 +322,7 @@ const PortfolioApp = () => {
   const [selectedSector, setSelectedSector] = useState(null);
 
   // Form states for adding new investments
-  const [newStockForm, setNewStockForm] = useState({
-    symbol: '',
-    currency: 'USD',
-    shares: '',
-    price: '',
-    sector: '',
-    accountType: 'RRSP',
-    purchaseDate: new Date().toISOString().split('T')[0]
-  });
+  // Deleted due to issue with localstorage
 
   const [newCashForm, setNewCashForm] = useState({
     currency: 'USD',
@@ -1181,6 +1173,16 @@ const PortfolioApp = () => {
   const UpdatePriceTab = () => {
     const [updateMode, setUpdateMode] = useState('price');
     
+    const [localNewStockForm, setLocalNewStockForm] = useState({
+      symbol: '',
+      currency: 'USD',
+      shares: '',
+      price: '',
+      sector: '',
+      accountType: 'RRSP',
+      purchaseDate: new Date().toISOString().split('T')[0]
+    });
+    
     const [priceForm, setPriceForm] = useState({
       symbol: '',
       newPrice: ''
@@ -1211,15 +1213,15 @@ const PortfolioApp = () => {
     };
 
     const handleAddStock = () => {
-      if (!newStockForm.symbol || !newStockForm.shares || !newStockForm.price || !newStockForm.sector) return;
+      if (!localNewStockForm.symbol || !localNewStockForm.shares || !localNewStockForm.price || !localNewStockForm.sector) return;
       
-      const shares = parseFloat(newStockForm.shares);
-      const price = parseFloat(newStockForm.price);
+      const shares = parseFloat(localNewStockForm.shares);
+      const price = parseFloat(localNewStockForm.price);
       const investment = shares * price;
       
       const newStock = {
-        symbol: newStockForm.symbol.toUpperCase(),
-        currency: newStockForm.currency,
+        symbol: localNewStockForm.symbol.toUpperCase(),
+        currency: localNewStockForm.currency,
         originalShares: shares,
         currentShares: shares,
         originalPrice: price,
@@ -1228,17 +1230,17 @@ const PortfolioApp = () => {
         currentValue: investment,
         gainLoss: 0,
         dividendReceived: 0,
-        sector: newStockForm.sector,
-        accountType: newStockForm.accountType,
+        sector: localNewStockForm.sector,
+        accountType: localNewStockForm.accountType,
         brokerage: 'Wealthsimple',
         lastUpdated: new Date().toISOString().split('T')[0],
-        purchaseDate: newStockForm.purchaseDate
+        purchaseDate: localNewStockForm.purchaseDate
       };
       
       const updatedData = [...portfolioData, newStock];
       updatePortfolioData(updatedData);
       
-      setNewStockForm({
+      setLocalNewStockForm({
         symbol: '',
         currency: 'USD',
         shares: '',
@@ -1435,8 +1437,8 @@ const PortfolioApp = () => {
                   <label className="block text-sm font-medium mb-1">Symbol *</label>
                   <input
                     type="text"
-                    value={newStockForm.symbol}
-                    onChange={(e) => setNewStockForm(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                    value={localNewStockForm.symbol}
+                    onChange={(e) => setLocalNewStockForm(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
                     className="w-full p-2 border rounded-md uppercase"
                     placeholder="AAPL"
                   />
@@ -1445,8 +1447,8 @@ const PortfolioApp = () => {
                 <div>
                   <label className="block text-sm font-medium mb-1">Currency *</label>
                   <select
-                    value={newStockForm.currency}
-                    onChange={(e) => setNewStockForm(prev => ({ ...prev, currency: e.target.value }))}
+                    value={localNewStockForm.currency}
+                    onChange={(e) => setLocalNewStockForm(prev => ({ ...prev, currency: e.target.value }))}
                     className="w-full p-2 border rounded-md"
                   >
                     <option value="USD">USD</option>
@@ -1461,8 +1463,8 @@ const PortfolioApp = () => {
                   <input
                     type="number"
                     step="0.01"
-                    value={newStockForm.shares}
-                    onChange={(e) => setNewStockForm(prev => ({ ...prev, shares: e.target.value }))}
+                    value={localNewStockForm.shares}
+                    onChange={(e) => setLocalNewStockForm(prev => ({ ...prev, shares: e.target.value }))}
                     className="w-full p-2 border rounded-md"
                     placeholder="100"
                   />
@@ -1473,8 +1475,8 @@ const PortfolioApp = () => {
                   <input
                     type="number"
                     step="0.01"
-                    value={newStockForm.price}
-                    onChange={(e) => setNewStockForm(prev => ({ ...prev, price: e.target.value }))}
+                    value={localNewStockForm.price}
+                    onChange={(e) => setLocalNewStockForm(prev => ({ ...prev, price: e.target.value }))}
                     className="w-full p-2 border rounded-md"
                     placeholder="150.00"
                   />
@@ -1485,8 +1487,8 @@ const PortfolioApp = () => {
                 <div>
                   <label className="block text-sm font-medium mb-1">Sector *</label>
                   <select
-                    value={newStockForm.sector}
-                    onChange={(e) => setNewStockForm(prev => ({ ...prev, sector: e.target.value }))}
+                    value={localNewStockForm.sector}
+                    onChange={(e) => setLocalNewStockForm(prev => ({ ...prev, sector: e.target.value }))}
                     className="w-full p-2 border rounded-md"
                   >
                     <option value="">Select Sector</option>
@@ -1499,8 +1501,8 @@ const PortfolioApp = () => {
                 <div>
                   <label className="block text-sm font-medium mb-1">Account Type *</label>
                   <select
-                    value={newStockForm.accountType}
-                    onChange={(e) => setNewStockForm(prev => ({ ...prev, accountType: e.target.value }))}
+                    value={localNewStockForm.accountType}
+                    onChange={(e) => setLocalNewStockForm(prev => ({ ...prev, accountType: e.target.value }))}
                     className="w-full p-2 border rounded-md"
                   >
                     {ACCOUNT_TYPES.map(accountType => (
@@ -1514,16 +1516,16 @@ const PortfolioApp = () => {
                 <label className="block text-sm font-medium mb-1">Purchase Date *</label>
                 <input
                   type="date"
-                  value={newStockForm.purchaseDate}
-                  onChange={(e) => setNewStockForm(prev => ({ ...prev, purchaseDate: e.target.value }))}
+                  value={localNewStockForm.purchaseDate}
+                  onChange={(e) => setLocalNewStockForm(prev => ({ ...prev, purchaseDate: e.target.value }))}
                   className="w-full p-2 border rounded-md"
                 />
               </div>
               
-              {newStockForm.shares && newStockForm.price && (
+              {localNewStockForm.shares && localNewStockForm.price && (
                 <div className="bg-gray-100 p-3 rounded-md">
                   <p className="text-sm font-medium">
-                    Total Investment: {newStockForm.currency} ${(parseFloat(newStockForm.shares || 0) * parseFloat(newStockForm.price || 0)).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                    Total Investment: {localNewStockForm.currency} ${(parseFloat(localNewStockForm.shares || 0) * parseFloat(localNewStockForm.price || 0)).toLocaleString('en-US', {minimumFractionDigits: 2})}
                   </p>
                 </div>
               )}
