@@ -2050,8 +2050,9 @@ const PortfolioApp = () => {
   };
 
   // Update Price Tab Component with Radio Button Options
+// FIXED Update Price Tab Component
   const UpdatePriceTab = () => {
-    const [updateMode, setUpdateMode] = useState('price'); // 'price', 'stock', 'cash', 'dividend'
+    const [updateMode, setUpdateMode] = useState('price'); // 'price', 'stock', 'cash', 'dividend', 'data'
     
     const [priceForm, setPriceForm] = useState({
       symbol: '',
@@ -2072,7 +2073,7 @@ const PortfolioApp = () => {
             currentPrice: newPrice,
             currentValue: newCurrentValue,
             gainLoss: newGainLoss,
-            lastUpdated: new Date().toISOString().split('T')[0] // Update timestamp
+            lastUpdated: new Date().toISOString().split('T')[0]
           };
         }
         return stock;
@@ -2102,7 +2103,7 @@ const PortfolioApp = () => {
         dividendReceived: 0,
         sector: newStockForm.sector,
         accountType: newStockForm.accountType,
-        brokerage: 'Wealthsimple', // Default to Wealthsimple
+        brokerage: 'Wealthsimple',
         lastUpdated: new Date().toISOString().split('T')[0],
         purchaseDate: newStockForm.purchaseDate
       };
@@ -2126,11 +2127,9 @@ const PortfolioApp = () => {
       
       const amount = parseFloat(newCashForm.amount);
       
-      // Check if currency already exists
       const existingCashIndex = cashPositions.findIndex(cash => cash.currency === newCashForm.currency);
       
       if (existingCashIndex >= 0) {
-        // Add to existing currency
         const updatedCash = cashPositions.map((cash, index) => 
           index === existingCashIndex 
             ? { ...cash, amount: cash.amount + amount }
@@ -2138,7 +2137,6 @@ const PortfolioApp = () => {
         );
         updateCashPositions(updatedCash);
       } else {
-        // Add new currency
         const updatedCash = [...cashPositions, {
           currency: newCashForm.currency,
           amount: amount,
@@ -2187,7 +2185,7 @@ const PortfolioApp = () => {
       <div className="p-4">
         <h2 className="text-2xl font-bold text-center mb-6">Portfolio Updates</h2>
         
-        {/* Radio Button Selection */}
+        {/* FIXED Radio Button Selection */}
         <div className="bg-gray-100 rounded-lg p-4 mb-6">
           <h3 className="font-bold mb-3">Select Action:</h3>
           <div className="space-y-2">
@@ -2249,7 +2247,7 @@ const PortfolioApp = () => {
           </div>
         </div>
 
-        {/* Update Stock Price Form */}
+        {/* FIXED Update Stock Price Form */}
         {updateMode === 'price' && (
           <div className="bg-white border rounded-lg p-4 mb-6 shadow-sm">
             <h3 className="font-bold mb-4 flex items-center">
@@ -2527,7 +2525,7 @@ const PortfolioApp = () => {
           </div>
         )}
 
-        {/* Data Management Section */}
+        {/* FIXED Data Management Section */}
         {updateMode === 'data' && (
           <div className="bg-white border rounded-lg p-4 shadow-sm">
             <h3 className="font-bold mb-4">💾 Data Management</h3>
