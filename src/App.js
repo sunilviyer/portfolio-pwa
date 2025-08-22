@@ -413,7 +413,7 @@ const PortfolioApp = () => {
   };
 
   const resetToInitialData = () => {
-    if (confirm('⚠️ This will reset all your portfolio data to initial values. Are you sure?')) {
+    if (window.confirm('⚠️ This will reset all your portfolio data to initial values. Are you sure?')) {
       updatePortfolioData(INITIAL_PORTFOLIO_DATA);
       updateCashPositions(INITIAL_CASH_POSITIONS);
       alert('🔄 Portfolio reset to initial data');
@@ -421,8 +421,8 @@ const PortfolioApp = () => {
   };
 
   const clearAllData = () => {
-    if (confirm('⚠️ This will delete ALL portfolio data permanently. Are you sure?')) {
-      if (confirm('🚨 FINAL WARNING: This cannot be undone. Continue?')) {
+    if (window.confirm('⚠️ This will delete ALL portfolio data permanently. Are you sure?')) {
+      if (window.confirm('🚨 FINAL WARNING: This cannot be undone. Continue?')) {
         localStorage.removeItem('portfolioData');
         localStorage.removeItem('cashPositions');
         updatePortfolioData([]);
