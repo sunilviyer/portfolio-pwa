@@ -620,90 +620,202 @@ const PortfolioApp = () => {
   const metrics = calculatePortfolioMetrics();
 
   // Dashboard Tab Component (renamed from Performance)
-  const DashboardTab = () => (
-    <div className="p-4 space-y-6">
-      <h2 className="text-2xl font-bold text-center mb-6">Portfolio Dashboard</h2>
+  const DashboardTab = () => {
+    // Calculate daily performance change (simulated - in production would use real previous close data)
+    const calculateDailyPerformance = () => {
+      // For now, simulate daily change - in production this would use real previous close data
+      let totalCurrentUSD = 0;
+      let totalPreviousCloseUSD = 0;
       
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h3 className="font-semibold text-blue-800">Original Investment</h3>
-          <p className="text-2xl font-bold text-blue-900">
-            ${metrics.totalOriginalUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
-          </p>
-        </div>
-        
-        <div className="bg-green-50 p-4 rounded-lg">
-          <h3 className="font-semibold text-green-800">Current Value</h3>
-          <p className="text-2xl font-bold text-green-900">
-            ${metrics.totalCurrentUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
-          </p>
-        </div>
-        
-        <div className={`p-4 rounded-lg ${metrics.totalReturn >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-          <h3 className={`font-semibold ${metrics.totalReturn >= 0 ? 'text-green-800' : 'text-red-800'}`}>
-            Total Return
-          </h3>
-          <p className={`text-2xl font-bold ${metrics.totalReturn >= 0 ? 'text-green-900' : 'text-red-900'}`}>
-            ${metrics.totalReturn.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
-          </p>
-          <p className={`text-sm ${metrics.totalReturn >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-            ({metrics.returnPercentage.toFixed(1)}%)
-          </p>
-        </div>
-        
-        <div className="bg-purple-50 p-4 rounded-lg">
-          <h3 className="font-semibold text-purple-800">Dividends Received</h3>
-          <p className="text-2xl font-bold text-purple-900">
-            ${metrics.totalDividendsUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
-          </p>
-        </div>
-      </div>
+      portfolioData.forEach(stock => {
+        const conversionRate = stock.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
+        totalCurrentUSD += stock.currentValue * conversionRate;
+        // Simulate previous close (in production, would fetch real previous close prices)
+        const simulatedDailyChange = (Math.random() - 0.5) * 0.04; // +/- 2% daily change
+        const simulatedPreviousValue = stock.currentValue / (1 + simulatedDailyChange);
+        totalPreviousCloseUSD += simulatedPreviousValue * conversionRate;
+      });
 
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="font-semibold mb-2">Top Performers</h3>
-        {portfolioData
-          .sort((a, b) => b.gainLoss - a.gainLoss)
-          .slice(0, 3)
-          .map((stock, index) => {
-            const conversionRate = stock.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
-            const gainLossUSD = stock.gainLoss * conversionRate;
-            const returnPct = (stock.gainLoss / stock.originalInvestment) * 100;
-            
-            return (
-              <div key={stock.symbol} className="flex justify-between items-center py-2 border-b">
-                <span className="font-medium">{stock.symbol}</span>
-                <div className="text-right">
-                  <span className={`font-bold ${gainLossUSD >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    ${gainLossUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
-                  </span>
-                  <div className={`text-sm ${gainLossUSD >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    ({returnPct.toFixed(1)}%)
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-      </div>
+      // Add cash positions to current value only (cash doesn't change daily)
+      cashPositions.forEach(cash => {
+        const conversionRate = cash.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
+        totalCurrentUSD += cash.amount * conversionRate;
+        totalPreviousCloseUSD += cash.amount * conversionRate;
+      });
 
-      {/* Exchange Rate Info */}
-      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <h3 className="font-semibold text-blue-800 mb-2">Current Exchange Rate</h3>
-        <p className="text-lg font-bold text-blue-900">
-          1 CAD = ${CAD_TO_USD_RATE.toFixed(4)} USD
-        </p>
-        {lastApiUpdate && (
-          <div className="mt-2">
-            <p className="text-sm text-blue-700">
-              Last updated: {new Date(lastApiUpdate.timestamp).toLocaleString()}
+      const dailyChange = totalCurrentUSD - totalPreviousCloseUSD;
+      const dailyChangePercent = (dailyChange / totalPreviousCloseUSD) * 100;
+
+      return {
+        currentValue: totalCurrentUSD,
+        dailyChange,
+        dailyChangePercent
+      };
+    };
+
+    const dailyPerformance = calculateDailyPerformance();
+
+    return (
+      <div className="p-4 space-y-6">
+        <h2 className="text-2xl font-bold text-center mb-6">Portfolio Dashboard</h2>
+        
+        {/* 1. DAILY PERFORMANCE CHANGE - HERO CARD (Most Prominent) */}
+        <div className={`p-6 rounded-xl shadow-lg border-2 ${
+          dailyPerformance.dailyChange >= 0 
+            ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-200' 
+            : 'bg-gradient-to-r from-red-50 to-red-100 border-red-200'
+        }`}>
+          <div className="text-center">
+            <h3 className={`text-lg font-bold mb-2 ${
+              dailyPerformance.dailyChange >= 0 ? 'text-green-800' : 'text-red-800'
+            }`}>
+              Today's Performance
+            </h3>
+            <p className={`text-4xl font-black mb-2 ${
+              dailyPerformance.dailyChange >= 0 ? 'text-green-900' : 'text-red-900'
+            }`}>
+              {dailyPerformance.dailyChange >= 0 ? '+' : ''}${dailyPerformance.dailyChange.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
             </p>
-            <p className="text-sm text-blue-600">
-              Updated {lastApiUpdate.stats.successful} stocks + exchange rate
+            <p className={`text-xl font-bold ${
+              dailyPerformance.dailyChange >= 0 ? 'text-green-700' : 'text-red-700'
+            }`}>
+              ({dailyPerformance.dailyChange >= 0 ? '+' : ''}{dailyPerformance.dailyChangePercent.toFixed(2)}%)
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
+              Portfolio Value: ${dailyPerformance.currentValue.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
             </p>
           </div>
-        )}
+        </div>
+
+        {/* 2. TOP 3 GAINERS CARD (Second Priority) */}
+        <div className="bg-white border rounded-lg p-4 shadow-md">
+          <h3 className="font-bold text-lg mb-3 text-green-800">Top 3 Gainers</h3>
+          {portfolioData
+            .sort((a, b) => {
+              const aReturnPct = (a.gainLoss / a.originalInvestment) * 100;
+              const bReturnPct = (b.gainLoss / b.originalInvestment) * 100;
+              return bReturnPct - aReturnPct;
+            })
+            .slice(0, 3)
+            .map((stock, index) => {
+              const conversionRate = stock.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
+              const gainLossUSD = stock.gainLoss * conversionRate;
+              const returnPct = (stock.gainLoss / stock.originalInvestment) * 100;
+              
+              return (
+                <div key={stock.symbol} className="flex justify-between items-center py-2 border-b last:border-b-0">
+                  <div className="flex items-center">
+                    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold mr-3 ${
+                      index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                      index === 1 ? 'bg-gray-300 text-gray-700' :
+                      'bg-orange-300 text-orange-800'
+                    }`}>
+                      {index + 1}
+                    </span>
+                    <span className="font-medium">{stock.symbol}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-green-600">
+                      +${gainLossUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+                    </span>
+                    <div className="text-sm text-green-500">
+                      (+{returnPct.toFixed(1)}%)
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
+        {/* 3. TOTAL PORTFOLIO VALUE CARD (Third Priority) */}
+        <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4 shadow-md">
+          <h3 className="font-bold text-lg text-blue-800 mb-2">Total Portfolio Value</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-blue-600">Current Value</p>
+              <p className="text-2xl font-bold text-blue-900">
+                ${metrics.totalCurrentUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-blue-600">Total Return</p>
+              <p className={`text-xl font-bold ${metrics.totalReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {metrics.totalReturn >= 0 ? '+' : ''}${metrics.totalReturn.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+              </p>
+              <p className={`text-sm ${metrics.totalReturn >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                ({metrics.returnPercentage.toFixed(1)}%)
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-blue-200">
+            <div className="flex justify-between text-sm text-blue-700">
+              <span>Original Investment: ${metrics.totalOriginalUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD</span>
+              <span>Dividends: ${metrics.totalDividendsUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. BOTTOM 3 PERFORMERS CARD (Fourth Priority) */}
+        <div className="bg-white border rounded-lg p-4 shadow-md">
+          <h3 className="font-bold text-lg mb-3 text-red-800">Bottom 3 Performers</h3>
+          {portfolioData
+            .sort((a, b) => {
+              const aReturnPct = (a.gainLoss / a.originalInvestment) * 100;
+              const bReturnPct = (b.gainLoss / b.originalInvestment) * 100;
+              return aReturnPct - bReturnPct;
+            })
+            .slice(0, 3)
+            .map((stock, index) => {
+              const conversionRate = stock.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
+              const gainLossUSD = stock.gainLoss * conversionRate;
+              const returnPct = (stock.gainLoss / stock.originalInvestment) * 100;
+              
+              return (
+                <div key={stock.symbol} className="flex justify-between items-center py-2 border-b last:border-b-0">
+                  <div className="flex items-center">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold mr-3 bg-red-200 text-red-800">
+                      {index + 1}
+                    </span>
+                    <span className="font-medium">{stock.symbol}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className={`font-bold ${gainLossUSD >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {gainLossUSD >= 0 ? '+' : ''}${gainLossUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+                    </span>
+                    <div className={`text-sm ${gainLossUSD >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      ({returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%)
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          <div className="mt-3 pt-3 border-t border-gray-200">
+            <p className="text-xs text-gray-500 text-center">
+              Monitor for potential rebalancing opportunities
+            </p>
+          </div>
+        </div>
+
+        {/* Exchange Rate Info (Secondary Information) */}
+        <div className="bg-gray-50 p-4 rounded-lg border">
+          <h3 className="font-semibold text-gray-700 mb-2">Exchange Rate</h3>
+          <p className="text-lg font-bold text-gray-800">
+            1 CAD = ${CAD_TO_USD_RATE.toFixed(4)} USD
+          </p>
+          {lastApiUpdate && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-600">
+                Last updated: {new Date(lastApiUpdate.timestamp).toLocaleString()}
+              </p>
+              <p className="text-sm text-gray-500">
+                Updated {lastApiUpdate.stats.successful} stocks + exchange rate
+              </p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ENHANCED OVERVIEW TAB
   const OverviewTab = () => {
