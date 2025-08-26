@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, List, PieChart, DollarSign, RefreshCw, ArrowLeft, Zap, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { BarChart3, TrendingUp, List, PieChart, DollarSign, RefreshCw, ArrowLeft, Zap, Clock, CheckCircle, AlertCircle, Menu, X, Download, Settings, Eye, Newspaper, CreditCard } from 'lucide-react';
 import { PieChart as RechartsPieChart, Cell, ResponsiveContainer, Tooltip, Pie } from 'recharts';
 
 const PortfolioApp = () => {
@@ -355,7 +355,7 @@ const PortfolioApp = () => {
     },
 
     async updatePortfolioAndCash(currentPortfolio, currentCash, onProgress) {
-      console.log("🔄 Starting automated portfolio + cash update...");
+      console.log("Starting automated portfolio + cash update...");
       
       const results = [];
       const errors = [];
@@ -381,7 +381,7 @@ const PortfolioApp = () => {
           console.log("Fetching CAD/USD exchange rate...");
           const exchangeData = await this.getExchangeRate();
           exchangeRate = exchangeData.rate;
-          console.log(`✅ Exchange rate: 1 CAD = ${exchangeRate} USD`);
+          console.log(`Exchange rate: 1 CAD = ${exchangeRate} USD`);
           
           // Wait for rate limit
           await new Promise(resolve => setTimeout(resolve, 12000));
@@ -455,9 +455,9 @@ const PortfolioApp = () => {
           lastUpdated: new Date().toISOString()
         }));
         
-        console.log(`✅ Successfully updated ${results.length} stocks and exchange rate`);
+        console.log(`Successfully updated ${results.length} stocks and exchange rate`);
         if (errors.length > 0) {
-          console.warn(`⚠️ Failed to update ${errors.length} stocks:`, errors);
+          console.warn(`Failed to update ${errors.length} stocks:`, errors);
         }
         
         return {
@@ -473,7 +473,7 @@ const PortfolioApp = () => {
         };
         
       } catch (error) {
-        console.error("❌ Portfolio update failed:", error);
+        console.error("Portfolio update failed:", error);
         throw error;
       }
     }
@@ -483,9 +483,9 @@ const PortfolioApp = () => {
   const saveToLocalStorage = (key, data) => {
     try {
       localStorage.setItem(key, JSON.stringify(data));
-      console.log(`✅ Saved ${key} to localStorage`);
+      console.log(`Saved ${key} to localStorage`);
     } catch (error) {
-      console.error(`❌ Failed to save ${key}:`, error);
+      console.error(`Failed to save ${key}:`, error);
     }
   };
 
@@ -494,13 +494,13 @@ const PortfolioApp = () => {
       const saved = localStorage.getItem(key);
       if (saved && saved !== 'undefined') {
         const parsed = JSON.parse(saved);
-        console.log(`✅ Loaded ${key} from localStorage`);
+        console.log(`Loaded ${key} from localStorage`);
         return parsed;
       }
     } catch (error) {
-      console.error(`❌ Failed to load ${key}:`, error);
+      console.error(`Failed to load ${key}:`, error);
     }
-    console.log(`📁 Using initial ${key} data`);
+    console.log(`Using initial ${key} data`);
     return fallback;
   };
 
@@ -513,7 +513,9 @@ const PortfolioApp = () => {
     loadFromLocalStorage('cashPositions', INITIAL_CASH_POSITIONS)
   );
 
-  const [activeTab, setActiveTab] = useState('performance');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeWorkflow, setActiveWorkflow] = useState('portfolio');
+  const [sideMenuOpen, setSideMenuOpen] = useState(false);
   const [selectedSector, setSelectedSector] = useState(null);
 
   // API Update States
@@ -574,11 +576,11 @@ const PortfolioApp = () => {
       setLastApiUpdate(updateInfo);
       saveToLocalStorage('lastApiUpdate', updateInfo);
       
-      alert(`✅ Portfolio & Cash Updated!\n\n📈 ${result.updateStats.successful} stocks updated\n💱 Exchange rate: 1 CAD = ${result.updateStats.exchangeRate.toFixed(4)} USD`);
+      alert(`Portfolio & Cash Updated!\n\n${result.updateStats.successful} stocks updated\nExchange rate: 1 CAD = ${result.updateStats.exchangeRate.toFixed(4)} USD`);
       
     } catch (error) {
       console.error('API update failed:', error);
-      alert(`❌ Update failed: ${error.message}`);
+      alert(`Update failed: ${error.message}`);
     } finally {
       setIsUpdating(false);
       setUpdateProgress(null);
@@ -617,10 +619,10 @@ const PortfolioApp = () => {
 
   const metrics = calculatePortfolioMetrics();
 
-  // Performance Tab Component
-  const PerformanceTab = () => (
+  // Dashboard Tab Component (renamed from Performance)
+  const DashboardTab = () => (
     <div className="p-4 space-y-6">
-      <h2 className="text-2xl font-bold text-center mb-6">Portfolio Performance</h2>
+      <h2 className="text-2xl font-bold text-center mb-6">Portfolio Dashboard</h2>
       
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-blue-50 p-4 rounded-lg">
@@ -685,7 +687,7 @@ const PortfolioApp = () => {
 
       {/* Exchange Rate Info */}
       <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <h3 className="font-semibold text-blue-800 mb-2">💱 Current Exchange Rate</h3>
+        <h3 className="font-semibold text-blue-800 mb-2">Current Exchange Rate</h3>
         <p className="text-lg font-bold text-blue-900">
           1 CAD = ${CAD_TO_USD_RATE.toFixed(4)} USD
         </p>
@@ -695,7 +697,7 @@ const PortfolioApp = () => {
               Last updated: {new Date(lastApiUpdate.timestamp).toLocaleString()}
             </p>
             <p className="text-sm text-blue-600">
-              📈 Updated {lastApiUpdate.stats.successful} stocks + exchange rate
+              Updated {lastApiUpdate.stats.successful} stocks + exchange rate
             </p>
           </div>
         )}
@@ -777,7 +779,7 @@ const PortfolioApp = () => {
                 {stock.sector} • {stock.accountType}
               </p>
               <p className="text-xs text-blue-600 font-medium">
-                📱 {stock.brokerage}
+                {stock.brokerage}
               </p>
               <p className="text-sm">
                 {stock.currentShares.toFixed(2)} shares @ {stock.currency} ${stock.currentPrice.toFixed(2)}
@@ -810,7 +812,7 @@ const PortfolioApp = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-t-lg p-4">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-lg text-blue-800">📱 {brokerage}</h3>
+                <h3 className="font-bold text-lg text-blue-800">{brokerage}</h3>
                 <p className="text-sm text-blue-600">{stats.stockCount} holdings</p>
               </div>
               <div className="text-right">
@@ -863,7 +865,7 @@ const PortfolioApp = () => {
                         : 'bg-white text-gray-700 border'
                     }`}
                   >
-                    📱 {brokerage} ({count})
+                    {brokerage} ({count})
                   </button>
                 );
               })}
@@ -924,7 +926,7 @@ const PortfolioApp = () => {
                     : 'bg-white text-gray-700 border'
                 }`}
               >
-                {groupByBrokerage ? '📱 Grouped' : '📋 List View'}
+                {groupByBrokerage ? 'Grouped' : 'List View'}
               </button>
             </div>
           </div>
@@ -954,7 +956,7 @@ const PortfolioApp = () => {
           {/* Enhanced Cash Positions */}
           {cashPositions.length > 0 && (
             <div className="bg-gray-100 border rounded-lg p-4">
-              <h3 className="font-bold text-lg mb-3">💰 Cash Positions</h3>
+              <h3 className="font-bold text-lg mb-3">Cash Positions</h3>
               {cashPositions.map((cash) => {
                 const usdValue = cash.currency === 'CAD' ? cash.amount * CAD_TO_USD_RATE : cash.amount;
                 return (
@@ -1486,7 +1488,7 @@ const PortfolioApp = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      alert('✅ Portfolio backup downloaded!');
+      alert('Portfolio backup downloaded!');
     };
 
     const importPortfolioData = (event) => {
@@ -1507,12 +1509,12 @@ const PortfolioApp = () => {
               saveToLocalStorage('lastApiUpdate', importData.lastApiUpdate);
             }
             
-            alert('✅ Portfolio data imported successfully!');
+            alert('Portfolio data imported successfully!');
           } else {
-            alert('❌ Invalid backup file format');
+            alert('Invalid backup file format');
           }
         } catch (error) {
-          alert('❌ Failed to import data: ' + error.message);
+          alert('Failed to import data: ' + error.message);
         }
       };
       reader.readAsText(file);
@@ -1520,25 +1522,25 @@ const PortfolioApp = () => {
     };
 
     const resetToInitialData = () => {
-      if (window.confirm('⚠️ This will reset all your portfolio data to initial values. Are you sure?')) {
+      if (window.confirm('This will reset all your portfolio data to initial values. Are you sure?')) {
         updatePortfolioData(INITIAL_PORTFOLIO_DATA);
         updateCashPositions(INITIAL_CASH_POSITIONS);
         setLastApiUpdate(null);
         saveToLocalStorage('lastApiUpdate', null);
-        alert('🔄 Portfolio reset to initial data');
+        alert('Portfolio reset to initial data');
       }
     };
 
     const clearAllData = () => {
-      if (window.confirm('⚠️ This will delete ALL portfolio data permanently. Are you sure?')) {
-        if (window.confirm('🚨 FINAL WARNING: This cannot be undone. Continue?')) {
+      if (window.confirm('This will delete ALL portfolio data permanently. Are you sure?')) {
+        if (window.confirm('FINAL WARNING: This cannot be undone. Continue?')) {
           localStorage.removeItem('portfolioData');
           localStorage.removeItem('cashPositions');
           localStorage.removeItem('lastApiUpdate');
           updatePortfolioData([]);
           updateCashPositions([]);
           setLastApiUpdate(null);
-          alert('🗑️ All data cleared');
+          alert('All data cleared');
         }
       }
     };
@@ -1562,7 +1564,7 @@ const PortfolioApp = () => {
                 onChange={(e) => setUpdateMode(e.target.value)}
                 className="mr-2"
               />
-              <span>🚀 Alpha Vantage API Updates</span>
+              <span>Alpha Vantage API Updates</span>
             </label>
             <label className="flex items-center">
               <input
@@ -1617,7 +1619,7 @@ const PortfolioApp = () => {
                 onChange={(e) => setUpdateMode(e.target.value)}
                 className="mr-2"
               />
-              <span>💾 Data Management</span>
+              <span>Data Management</span>
             </label>
           </div>
         </div>
@@ -1632,11 +1634,11 @@ const PortfolioApp = () => {
               </h3>
               
               <div className="mb-4 text-sm text-gray-700">
-                <p>📊 <strong>Your Portfolio:</strong> {usdStocks.length} USD stocks, {cadStocks.length} CAD stocks</p>
-                <p>🔄 <strong>Will update:</strong> All {portfolioData.length} stocks + CAD/USD exchange rate</p>
-                <p>⏱️ <strong>Estimated time:</strong> ~{Math.ceil((portfolioData.length + 1) * 12 / 60)} minutes</p>
-                <p>🎯 <strong>Rate limit:</strong> 25 calls/day (free tier) | 5 calls/minute</p>
-                <p>💰 <strong>Cash rates:</strong> Live CAD/USD exchange rate</p>
+                <p><strong>Your Portfolio:</strong> {usdStocks.length} USD stocks, {cadStocks.length} CAD stocks</p>
+                <p><strong>Will update:</strong> All {portfolioData.length} stocks + CAD/USD exchange rate</p>
+                <p><strong>Estimated time:</strong> ~{Math.ceil((portfolioData.length + 1) * 12 / 60)} minutes</p>
+                <p><strong>Rate limit:</strong> 25 calls/day (free tier) | 5 calls/minute</p>
+                <p><strong>Cash rates:</strong> Live CAD/USD exchange rate</p>
               </div>
 
               {lastApiUpdate && (
@@ -1646,10 +1648,10 @@ const PortfolioApp = () => {
                     {new Date(lastApiUpdate.timestamp).toLocaleString()}
                   </p>
                   <p className="text-sm text-blue-600">
-                    ✅ {lastApiUpdate.stats.successful} stocks + exchange rate updated
+                    {lastApiUpdate.stats.successful} stocks + exchange rate updated
                   </p>
                   <p className="text-sm text-blue-600">
-                    💱 Rate: 1 CAD = {lastApiUpdate.stats.exchangeRate?.toFixed(4)} USD
+                    Rate: 1 CAD = {lastApiUpdate.stats.exchangeRate?.toFixed(4)} USD
                   </p>
                 </div>
               )}
@@ -1697,26 +1699,26 @@ const PortfolioApp = () => {
                       : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
-                  {isUpdating ? '🔄 Updating Portfolio + Cash...' : '🚀 Update All Stocks + Exchange Rate'}
+                  {isUpdating ? 'Updating Portfolio + Cash...' : 'Update All Stocks + Exchange Rate'}
                 </button>
 
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => EnhancedAPI.getStockQuote('AAPL').then(quote => 
-                      alert(`✅ Test Success!\n\nAAPL: $${quote.price}\nChange: ${quote.change >= 0 ? '+' : ''}${quote.change} (${quote.changePercent}%)`)
-                    ).catch(error => alert(`❌ Test Failed: ${error.message}`))}
+                      alert(`Test Success!\n\nAAPL: $${quote.price}\nChange: ${quote.change >= 0 ? '+' : ''}${quote.change} (${quote.changePercent}%)`)
+                    ).catch(error => alert(`Test Failed: ${error.message}`))}
                     className="bg-green-600 text-white py-2 rounded-md font-medium hover:bg-green-700 transition-colors"
                   >
-                    🧪 Test USD Stock
+                    Test USD Stock
                   </button>
                   
                   <button
                     onClick={() => EnhancedAPI.getExchangeRate().then(rate => 
-                      alert(`✅ Exchange Rate Test!\n\n1 CAD = ${rate.rate} USD\nUpdated: ${rate.lastUpdated}`)
-                    ).catch(error => alert(`❌ Exchange Test Failed: ${error.message}`))}
+                      alert(`Exchange Rate Test!\n\n1 CAD = ${rate.rate} USD\nUpdated: ${rate.lastUpdated}`)
+                    ).catch(error => alert(`Exchange Test Failed: ${error.message}`))}
                     className="bg-purple-600 text-white py-2 rounded-md font-medium hover:bg-purple-700 transition-colors"
                   >
-                    💱 Test Exchange Rate
+                    Test Exchange Rate
                   </button>
                 </div>
               </div>
@@ -1725,7 +1727,7 @@ const PortfolioApp = () => {
             {/* Enhanced stocks display */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white border rounded-lg p-4">
-                <h4 className="font-bold mb-3 text-green-700">📈 USD Stocks (API Updates)</h4>
+                <h4 className="font-bold mb-3 text-green-700">USD Stocks (API Updates)</h4>
                 <div className="space-y-2 max-h-32 overflow-y-auto">
                   {usdStocks.map(stock => (
                     <div key={stock.symbol} className="flex justify-between text-sm">
@@ -1739,7 +1741,7 @@ const PortfolioApp = () => {
               </div>
 
               <div className="bg-white border rounded-lg p-4">
-                <h4 className="font-bold mb-3 text-red-700">🍁 CAD Stocks (API Updates)</h4>
+                <h4 className="font-bold mb-3 text-red-700">CAD Stocks (API Updates)</h4>
                 <div className="space-y-2 max-h-32 overflow-y-auto">
                   {cadStocks.map(stock => (
                     <div key={stock.symbol} className="flex justify-between text-sm">
@@ -1751,7 +1753,7 @@ const PortfolioApp = () => {
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  ✅ Alpha Vantage supports .TO symbols
+                  Alpha Vantage supports .TO symbols
                 </p>
               </div>
             </div>
@@ -2055,14 +2057,14 @@ const PortfolioApp = () => {
         {/* Data Management */}
         {updateMode === 'data' && (
           <div className="bg-white border rounded-lg p-4 shadow-sm">
-            <h3 className="font-bold mb-4">💾 Data Management</h3>
+            <h3 className="font-bold mb-4">Data Management</h3>
             
             <div className="space-y-3">
               <button
                 onClick={exportPortfolioData}
                 className="w-full bg-green-600 text-white py-2 rounded-md font-medium hover:bg-green-700 transition-colors"
               >
-                📤 Export Backup
+                Export Backup
               </button>
               
               <div>
@@ -2080,25 +2082,25 @@ const PortfolioApp = () => {
                 onClick={resetToInitialData}
                 className="w-full bg-yellow-600 text-white py-2 rounded-md font-medium hover:bg-yellow-700 transition-colors"
               >
-                🔄 Reset to Initial Data
+                Reset to Initial Data
               </button>
               
               <button
                 onClick={clearAllData}
                 className="w-full bg-red-600 text-white py-2 rounded-md font-medium hover:bg-red-700 transition-colors"
               >
-                🗑️ Clear All Data
+                Clear All Data
               </button>
             </div>
             
             <div className="mt-4 text-xs text-gray-500 bg-gray-50 p-3 rounded-md">
-              <p><strong>💡 Enhanced Data Management:</strong></p>
+              <p><strong>Enhanced Data Management:</strong></p>
               <p>• All changes automatically saved</p>
               <p>• Cash exchange rates updated via API</p>
               <p>• CAD stocks support via .TO symbols</p>
               <p>• Backup includes API update history</p>
               <div className="mt-2">
-                <p><strong>📊 Current Storage:</strong></p>
+                <p><strong>Current Storage:</strong></p>
                 <p>• {portfolioData.length} stocks tracked</p>
                 <p>• {cashPositions.length} cash positions</p>
                 <p>• Exchange rate: 1 CAD = {CAD_TO_USD_RATE.toFixed(4)} USD</p>
@@ -2111,68 +2113,555 @@ const PortfolioApp = () => {
     );
   };
 
+  // Export Tab Component
+  const ExportTab = () => {
+    const exportPortfolioData = () => {
+      const exportData = {
+        portfolioData,
+        cashPositions,
+        lastApiUpdate,
+        exportDate: new Date().toISOString(),
+        version: '1.1'
+      };
+      
+      // CSV Export (Phase 1 requirement)
+      const csvHeaders = ['Symbol', 'Shares', 'CurrentPrice', 'CurrentValue', 'GainLoss', 'GainLossPercent', 'Sector', 'AccountType', 'Brokerage', 'Currency'];
+      
+      const csvData = portfolioData.map(stock => {
+        const returnPct = ((stock.gainLoss / stock.originalInvestment) * 100).toFixed(2);
+        return [
+          stock.symbol,
+          stock.currentShares.toFixed(2),
+          stock.currentPrice.toFixed(2),
+          stock.currentValue.toFixed(2),
+          stock.gainLoss.toFixed(2),
+          `${returnPct}%`,
+          stock.sector,
+          stock.accountType,
+          stock.brokerage,
+          stock.currency
+        ];
+      });
+      
+      const csvContent = [csvHeaders, ...csvData].map(row => row.join(',')).join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `portfolio_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      alert('Portfolio CSV exported successfully!');
+    };
+
+    return (
+      <div className="p-4">
+        <h2 className="text-2xl font-bold text-center mb-6">Export Portfolio</h2>
+        
+        <div className="bg-white border rounded-lg p-4 shadow-sm space-y-4">
+          <div className="text-center">
+            <Download size={48} className="mx-auto text-blue-600 mb-4" />
+            <h3 className="font-bold text-lg mb-2">Export Portfolio Data</h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Export your complete portfolio data including holdings, performance, and account details.
+            </p>
+          </div>
+          
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h4 className="font-medium mb-2">Export Includes:</h4>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>• Stock symbols and current shares</li>
+              <li>• Current prices and total values</li>
+              <li>• Gain/loss amounts and percentages</li>
+              <li>• Sector classifications</li>
+              <li>• Account types and brokerages</li>
+              <li>• Currency information</li>
+            </ul>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-3">
+            <div className="bg-blue-50 p-3 rounded-md">
+              <p className="text-sm font-medium text-blue-800">Portfolio Summary</p>
+              <p className="text-sm text-blue-600">
+                {portfolioData.length} holdings • {cashPositions.length} cash positions
+              </p>
+              <p className="text-sm text-blue-600">
+                Total Value: ${metrics.totalCurrentUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+              </p>
+            </div>
+          </div>
+          
+          <button
+            onClick={exportPortfolioData}
+            className="w-full bg-blue-600 text-white py-3 rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center justify-center"
+          >
+            <Download className="mr-2" size={20} />
+            Export as CSV
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Settings Tab Component
+  const SettingsTab = () => {
+    const [settings, setSettings] = useState(() => ({
+      currency: 'USD',
+      refreshFrequency: '3x-daily',
+      enableFaceId: true,
+      enablePinAuth: true,
+      autoLock: 'immediate',
+      hideScreenValues: true,
+      decimalPlaces: 2,
+      showDividends: true
+    }));
+
+    const updateSetting = (key, value) => {
+      setSettings(prev => ({
+        ...prev,
+        [key]: value
+      }));
+      // Save to localStorage
+      const newSettings = { ...settings, [key]: value };
+      saveToLocalStorage('appSettings', newSettings);
+    };
+
+    return (
+      <div className="p-4">
+        <h2 className="text-2xl font-bold text-center mb-6">Settings</h2>
+        
+        <div className="space-y-4">
+          {/* Portfolio Settings */}
+          <div className="bg-white border rounded-lg p-4 shadow-sm">
+            <h3 className="font-bold mb-4 flex items-center">
+              <BarChart3 className="mr-2" size={20} />
+              Portfolio Settings
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Default Currency</label>
+                <select
+                  value={settings.currency}
+                  onChange={(e) => updateSetting('currency', e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="USD">USD</option>
+                  <option value="CAD">CAD</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Price Update Frequency</label>
+                <select
+                  value={settings.refreshFrequency}
+                  onChange={(e) => updateSetting('refreshFrequency', e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="3x-daily">3x Daily (8:30 AM, 12:30 PM, 6:00 PM)</option>
+                  <option value="hourly">Every Hour</option>
+                  <option value="manual">Manual Only</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Decimal Places</label>
+                <select
+                  value={settings.decimalPlaces}
+                  onChange={(e) => updateSetting('decimalPlaces', parseInt(e.target.value))}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value={0}>0 (Whole numbers)</option>
+                  <option value={2}>2 (Standard)</option>
+                  <option value={4}>4 (Precise)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Security Settings */}
+          <div className="bg-white border rounded-lg p-4 shadow-sm">
+            <h3 className="font-bold mb-4 flex items-center">
+              <AlertCircle className="mr-2" size={20} />
+              Security Settings
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="font-medium">Face ID / Touch ID</label>
+                  <p className="text-sm text-gray-600">Use biometric authentication</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.enableFaceId}
+                    onChange={(e) => updateSetting('enableFaceId', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="font-medium">PIN Authentication</label>
+                  <p className="text-sm text-gray-600">Backup authentication method</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.enablePinAuth}
+                    onChange={(e) => updateSetting('enablePinAuth', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Auto-Lock</label>
+                <select
+                  value={settings.autoLock}
+                  onChange={(e) => updateSetting('autoLock', e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="immediate">Immediate</option>
+                  <option value="1min">1 Minute</option>
+                  <option value="5min">5 Minutes</option>
+                  <option value="never">Never</option>
+                </select>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="font-medium">Hide Screen Values</label>
+                  <p className="text-sm text-gray-600">Hide values in app switcher</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.hideScreenValues}
+                    onChange={(e) => updateSetting('hideScreenValues', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Data Management */}
+          <div className="bg-white border rounded-lg p-4 shadow-sm">
+            <h3 className="font-bold mb-4 flex items-center">
+              <Settings className="mr-2" size={20} />
+              Data Management
+            </h3>
+            
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  // Clear cache logic
+                  localStorage.clear();
+                  alert('Cache cleared successfully');
+                }}
+                className="w-full bg-yellow-600 text-white py-2 rounded-md font-medium hover:bg-yellow-700 transition-colors"
+              >
+                Clear Cache
+              </button>
+              
+              <button
+                onClick={() => {
+                  if (confirm('This will reset all settings to defaults. Continue?')) {
+                    localStorage.removeItem('appSettings');
+                    setSettings({
+                      currency: 'USD',
+                      refreshFrequency: '3x-daily',
+                      enableFaceId: true,
+                      enablePinAuth: true,
+                      autoLock: 'immediate',
+                      hideScreenValues: true,
+                      decimalPlaces: 2,
+                      showDividends: true
+                    });
+                    alert('Settings reset to defaults');
+                  }
+                }}
+                className="w-full bg-red-600 text-white py-2 rounded-md font-medium hover:bg-red-700 transition-colors"
+              >
+                Reset Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Side Menu Component
+  const SideMenu = () => {
+    const menuItems = [
+      { 
+        id: 'portfolio', 
+        icon: BarChart3, 
+        label: 'Portfolio', 
+        available: true,
+        description: 'View and manage your investments'
+      },
+      { 
+        id: 'export', 
+        icon: Download, 
+        label: 'Export', 
+        available: true,
+        description: 'Export portfolio data'
+      },
+      { 
+        id: 'update', 
+        icon: RefreshCw, 
+        label: 'Update', 
+        available: true,
+        description: 'Manual updates and data management'
+      },
+      { 
+        id: 'settings', 
+        icon: Settings, 
+        label: 'Settings', 
+        available: true,
+        description: 'App configuration and security'
+      },
+      { 
+        id: 'watchlist', 
+        icon: Eye, 
+        label: 'Watchlist', 
+        available: false,
+        description: 'Coming in Phase 2'
+      },
+      { 
+        id: 'news', 
+        icon: Newspaper, 
+        label: 'News', 
+        available: false,
+        description: 'Coming in Phase 3'
+      },
+      { 
+        id: 'transactions', 
+        icon: CreditCard, 
+        label: 'Transactions', 
+        available: false,
+        description: 'Coming in Phase 8'
+      }
+    ];
+
+    const handleWorkflowChange = (workflowId) => {
+      if (menuItems.find(item => item.id === workflowId)?.available) {
+        setActiveWorkflow(workflowId);
+        if (workflowId === 'portfolio') {
+          setActiveTab('dashboard');
+        }
+        setSideMenuOpen(false);
+      }
+    };
+
+    return (
+      <>
+        {/* Overlay */}
+        {sideMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => setSideMenuOpen(false)}
+          />
+        )}
+        
+        {/* Side Menu */}
+        <div className={`fixed left-0 top-0 h-full w-80 bg-white shadow-lg transform transition-transform duration-300 z-50 ${
+          sideMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          <div className="flex items-center justify-between p-4 border-b">
+            <h2 className="text-xl font-bold">Portfolio App</h2>
+            <button
+              onClick={() => setSideMenuOpen(false)}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="p-4">
+            <h3 className="font-medium text-gray-600 mb-4 text-sm uppercase tracking-wide">
+              Primary Workflows
+            </h3>
+            
+            <div className="space-y-2">
+              {menuItems.map(item => {
+                const Icon = item.icon;
+                const isActive = activeWorkflow === item.id;
+                const isAvailable = item.available;
+                
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleWorkflowChange(item.id)}
+                    disabled={!isAvailable}
+                    className={`w-full flex items-center p-3 rounded-lg text-left transition-colors ${
+                      isActive && isAvailable
+                        ? 'bg-blue-100 text-blue-600 border border-blue-200' 
+                        : isAvailable
+                        ? 'hover:bg-gray-100 text-gray-700'
+                        : 'text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Icon size={20} className="mr-3" />
+                    <div className="flex-1">
+                      <div className="font-medium">{item.label}</div>
+                      <div className="text-xs text-gray-500">{item.description}</div>
+                    </div>
+                    {!isAvailable && (
+                      <span className="text-xs bg-gray-200 px-2 py-1 rounded">Soon</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* Footer */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-gray-50">
+            <div className="text-xs text-gray-500">
+              <p>Portfolio PWA v1.0</p>
+              <p>Phase 1: Core Foundation</p>
+              <p className="mt-1">
+                Total: ${metrics.totalCurrentUSD.toLocaleString('en-US', {minimumFractionDigits: 0})} USD
+              </p>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
   // Navigation Component
   const Navigation = () => {
+    // Only show bottom tabs when Portfolio workflow is active
+    if (activeWorkflow !== 'portfolio') {
+      return null;
+    }
+
     const tabs = [
-      { id: 'performance', icon: TrendingUp, label: 'Performance' },
+      { id: 'dashboard', icon: TrendingUp, label: 'Dashboard' },
       { id: 'overview', icon: List, label: 'Overview' },
-      { id: 'sector', icon: PieChart, label: 'Sectors' },
-      { id: 'dividend', icon: DollarSign, label: 'Dividends' },
-      { id: 'update', icon: RefreshCw, label: 'Update' }
+      { id: 'sectors', icon: PieChart, label: 'Sectors' },
+      { id: 'dividends', icon: DollarSign, label: 'Dividends' }
     ];
 
     return (
-   <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50">
-      <div className="flex justify-around max-w-md mx-auto">
-    {tabs.map(tab => {
-      const Icon = tab.icon;
-      const isActive = activeTab === tab.id;
-      
-      return (
-        <button
-          key={tab.id}
-          onClick={() => setActiveTab(tab.id)}
-          className={`flex flex-col items-center py-2 px-3 rounded-lg transition-colors ${
-            isActive 
-              ? 'bg-blue-100 text-blue-600' 
-              : 'text-gray-600 hover:text-gray-800'
-          }`}
-        >
-          <Icon size={20} />
-          <span className="text-xs mt-1">{tab.label}</span>
-        </button>
-      );
-    })}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-30">
+        <div className="flex justify-around max-w-md mx-auto">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-colors ${
+                  isActive 
+                    ? 'bg-blue-100 text-blue-600' 
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                <Icon size={20} />
+                <span className="text-xs mt-1">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </div>
     );
+  };
+
+  // Content Renderer
+  const renderContent = () => {
+    switch (activeWorkflow) {
+      case 'portfolio':
+        switch (activeTab) {
+          case 'dashboard':
+            return <DashboardTab />;
+          case 'overview':
+            return <OverviewTab />;
+          case 'sectors':
+            return <SectorBreakdownTab />;
+          case 'dividends':
+            return <DividendTab />;
+          default:
+            return <DashboardTab />;
+        }
+      case 'export':
+        return <ExportTab />;
+      case 'update':
+        return <UpdatePriceTab />;
+      case 'settings':
+        return <SettingsTab />;
+      default:
+        return (
+          <div className="p-4 text-center">
+            <h2 className="text-2xl font-bold mb-4">Feature Coming Soon</h2>
+            <p className="text-gray-600">This feature will be available in a future phase.</p>
+          </div>
+        );
+    }
   };
 
   // Main App Component
   return (
     <div className="max-w-md mx-auto bg-gray-50 min-h-screen flex flex-col pb-20">
+      {/* Side Menu */}
+      <SideMenu />
+      
       {/* Header */}
-      <div style={{backgroundColor: '#2563eb', color: 'white', padding: '1rem', textAlign: 'center'}}>
-        <h1 className="text-xl font-bold">Portfolio</h1>
-        <p className="text-sm opacity-90">Total: ${metrics.totalCurrentUSD.toLocaleString('en-US', {minimumFractionDigits: 0})} USD</p>
-        {isUpdating && (
-          <p className="text-xs opacity-75 mt-1">🔄 Updating prices + exchange rate...</p>
-        )}
-        <p className="text-xs opacity-75">
-          💱 1 CAD = ${CAD_TO_USD_RATE.toFixed(4)} USD
-        </p>
+      <div style={{backgroundColor: '#2563eb', color: 'white', padding: '1rem'}}>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setSideMenuOpen(true)}
+            className="p-2 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            <Menu size={20} />
+          </button>
+          
+          <div className="text-center flex-1">
+            <h1 className="text-xl font-bold">
+              {activeWorkflow === 'portfolio' ? 'Portfolio' : 
+               activeWorkflow === 'export' ? 'Export' :
+               activeWorkflow === 'update' ? 'Update' :
+               activeWorkflow === 'settings' ? 'Settings' : 'Portfolio App'}
+            </h1>
+            {activeWorkflow === 'portfolio' && (
+              <>
+                <p className="text-sm opacity-90">Total: ${metrics.totalCurrentUSD.toLocaleString('en-US', {minimumFractionDigits: 0})} USD</p>
+                {isUpdating && (
+                  <p className="text-xs opacity-75 mt-1">Updating prices + exchange rate...</p>
+                )}
+                <p className="text-xs opacity-75">
+                  1 CAD = ${CAD_TO_USD_RATE.toFixed(4)} USD
+                </p>
+              </>
+            )}
+          </div>
+          
+          <div className="w-10"></div> {/* Spacer for centering */}
+        </div>
       </div>
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'performance' && <PerformanceTab />}
-        {activeTab === 'overview' && <OverviewTab />}
-        {activeTab === 'sector' && <SectorBreakdownTab />}
-        {activeTab === 'dividend' && <DividendTab />}
-        {activeTab === 'update' && <UpdatePriceTab />}
+        {renderContent()}
       </div>
 
-      {/* Navigation */}
+      {/* Navigation - Only shows for Portfolio workflow */}
       <Navigation />
     </div>
   );
