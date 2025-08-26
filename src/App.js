@@ -288,7 +288,7 @@ const PortfolioApp = () => {
     { currency: 'CAD', amount: 48.02, dateAdded: '2025-01-01', exchangeRate: 0.74 }
   ];
 
-  // Enhanced API Functions for both USD and CAD stocks + Exchange Rates
+  // Enhanced API Functions
   const EnhancedAPI = {
     async getStockQuote(symbol) {
       try {
@@ -352,130 +352,6 @@ const PortfolioApp = () => {
         console.error("Error fetching exchange rate:", error);
         throw error;
       }
-    },
-
-    async updatePortfolioAndCash(currentPortfolio, currentCash, onProgress) {
-      console.log("Starting automated portfolio + cash update...");
-      
-      const results = [];
-      const errors = [];
-      let exchangeRate = 0.74; // fallback
-      
-      // Get all stocks (USD and CAD with .TO suffix)
-      const allStocks = currentPortfolio;
-      const totalOperations = allStocks.length + 1; // +1 for exchange rate
-      let currentOperation = 0;
-      
-      try {
-        // First, get exchange rate
-        try {
-          if (onProgress) {
-            onProgress({
-              current: ++currentOperation,
-              total: totalOperations,
-              symbol: 'CAD/USD',
-              status: 'fetching'
-            });
-          }
-          
-          console.log("Fetching CAD/USD exchange rate...");
-          const exchangeData = await this.getExchangeRate();
-          exchangeRate = exchangeData.rate;
-          console.log(`Exchange rate: 1 CAD = ${exchangeRate} USD`);
-          
-          // Wait for rate limit
-          await new Promise(resolve => setTimeout(resolve, 12000));
-          
-        } catch (error) {
-          console.warn("Failed to get exchange rate, using fallback:", error.message);
-        }
-        
-        // Update stock prices
-        for (let i = 0; i < allStocks.length; i++) {
-          const stock = allStocks[i];
-          
-          try {
-            if (onProgress) {
-              onProgress({
-                current: ++currentOperation,
-                total: totalOperations,
-                symbol: stock.symbol,
-                status: 'fetching'
-              });
-            }
-            
-            console.log(`Fetching ${stock.symbol} (${currentOperation}/${totalOperations})...`);
-            const quote = await this.getStockQuote(stock.symbol);
-            results.push({ ...quote, originalSymbol: stock.symbol });
-            
-            // Rate limiting: wait between requests
-            if (i < allStocks.length - 1) {
-              console.log(`Waiting 12 seconds before next request...`);
-              if (onProgress) {
-                onProgress({
-                  current: currentOperation,
-                  total: totalOperations,
-                  symbol: stock.symbol,
-                  status: 'waiting'
-                });
-              }
-              await new Promise(resolve => setTimeout(resolve, 12000));
-            }
-            
-          } catch (error) {
-            console.error(`Failed to fetch ${stock.symbol}:`, error.message);
-            errors.push({ symbol: stock.symbol, error: error.message });
-          }
-        }
-        
-        // Update portfolio data
-        const updatedPortfolio = currentPortfolio.map(stock => {
-          const updatedQuote = results.find(quote => quote.originalSymbol === stock.symbol);
-          
-          if (updatedQuote) {
-            const newCurrentValue = stock.currentShares * updatedQuote.price;
-            const newGainLoss = newCurrentValue - stock.originalInvestment;
-            
-            return {
-              ...stock,
-              currentPrice: updatedQuote.price,
-              currentValue: newCurrentValue,
-              gainLoss: newGainLoss,
-              lastUpdated: new Date().toISOString().split('T')[0]
-            };
-          } else {
-            return stock;
-          }
-        });
-        
-        // Update cash positions with new exchange rate
-        const updatedCash = currentCash.map(cash => ({
-          ...cash,
-          exchangeRate: cash.currency === 'CAD' ? exchangeRate : 1.0,
-          lastUpdated: new Date().toISOString()
-        }));
-        
-        console.log(`Successfully updated ${results.length} stocks and exchange rate`);
-        if (errors.length > 0) {
-          console.warn(`Failed to update ${errors.length} stocks:`, errors);
-        }
-        
-        return {
-          portfolio: updatedPortfolio,
-          cash: updatedCash,
-          updateStats: {
-            successful: results.length,
-            failed: errors.length,
-            totalProcessed: allStocks.length,
-            exchangeRate: exchangeRate,
-            timestamp: new Date().toISOString()
-          }
-        };
-        
-      } catch (error) {
-        console.error("Portfolio update failed:", error);
-        throw error;
-      }
     }
   };
 
@@ -483,7 +359,6 @@ const PortfolioApp = () => {
   const saveToLocalStorage = (key, data) => {
     try {
       localStorage.setItem(key, JSON.stringify(data));
-      console.log(`Saved ${key} to localStorage`);
     } catch (error) {
       console.error(`Failed to save ${key}:`, error);
     }
@@ -494,13 +369,11 @@ const PortfolioApp = () => {
       const saved = localStorage.getItem(key);
       if (saved && saved !== 'undefined') {
         const parsed = JSON.parse(saved);
-        console.log(`Loaded ${key} from localStorage`);
         return parsed;
       }
     } catch (error) {
       console.error(`Failed to load ${key}:`, error);
     }
-    console.log(`Using initial ${key} data`);
     return fallback;
   };
 
@@ -518,76 +391,28 @@ const PortfolioApp = () => {
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
   const [selectedSector, setSelectedSector] = useState(null);
   const [displayCurrency, setDisplayCurrency] = useState('USD');
+  const [errorBanner, setErrorBanner] = useState(null);
 
   // API Update States
   const [isUpdating, setIsUpdating] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState(null);
   const [lastApiUpdate, setLastApiUpdate] = useState(() => 
     loadFromLocalStorage('lastApiUpdate', null)
   );
 
-  // Form states
-  const [newCashForm, setNewCashForm] = useState({
-    currency: 'USD',
-    amount: '',
-    dateAdded: new Date().toISOString().split('T')[0]
-  });
-
   // Service Worker Registration
   useEffect(() => {
-    // Register service worker for PWA functionality
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
           .then((registration) => {
             console.log('SW registered: ', registration);
-            
-            // Listen for updates
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing;
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // New version available
-                  console.log('New app version available. Please refresh.');
-                }
-              });
-            });
           })
           .catch((registrationError) => {
             console.log('SW registration failed: ', registrationError);
           });
       });
-
-      // Listen for messages from service worker
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        const { type, payload } = event.data;
-        
-        switch (type) {
-          case 'SYNC_COMPLETE':
-            console.log('Background sync completed');
-            // Optionally refresh portfolio data here
-            break;
-          default:
-            console.log('Unknown message from SW:', type);
-        }
-      });
     }
   }, []);
-
-  // Cache portfolio data when it updates (for offline access)
-  useEffect(() => {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'CACHE_PORTFOLIO_DATA',
-        payload: {
-          portfolioData,
-          cashPositions,
-          lastApiUpdate,
-          timestamp: new Date().toISOString()
-        }
-      });
-    }
-  }, [portfolioData, cashPositions, lastApiUpdate]);
 
   // Conversion rates
   const getCurrentExchangeRate = () => {
@@ -636,34 +461,6 @@ const PortfolioApp = () => {
     saveToLocalStorage('cashPositions', newCash);
   };
 
-  // Enhanced API Update Function
-  const handleApiUpdate = async () => {
-    setIsUpdating(true);
-    setUpdateProgress({ current: 0, total: 0, symbol: 'Starting...', status: 'starting' });
-    
-    try {
-      const result = await EnhancedAPI.updatePortfolioAndCash(portfolioData, cashPositions, setUpdateProgress);
-      updatePortfolioData(result.portfolio);
-      updateCashPositions(result.cash);
-      
-      const updateInfo = {
-        timestamp: new Date().toISOString(),
-        stats: result.updateStats
-      };
-      setLastApiUpdate(updateInfo);
-      saveToLocalStorage('lastApiUpdate', updateInfo);
-      
-      alert(`Portfolio & Cash Updated!\n\n${result.updateStats.successful} stocks updated\nExchange rate: 1 CAD = ${result.updateStats.exchangeRate.toFixed(4)} USD`);
-      
-    } catch (error) {
-      console.error('API update failed:', error);
-      alert(`Update failed: ${error.message}`);
-    } finally {
-      setIsUpdating(false);
-      setUpdateProgress(null);
-    }
-  };
-
   // Calculate portfolio metrics
   const calculatePortfolioMetrics = () => {
     let totalOriginalUSD = 0;
@@ -695,6 +492,71 @@ const PortfolioApp = () => {
   };
 
   const metrics = calculatePortfolioMetrics();
+
+  // Error handling functions
+  const showErrorBanner = (error) => {
+    const errorInfo = {
+      message: error.message || 'An unexpected error occurred',
+      timestamp: new Date().toISOString(),
+      details: {
+        stack: error.stack || 'No stack trace',
+        workflow: activeWorkflow,
+        tab: activeTab,
+        currency: displayCurrency,
+        portfolioCount: portfolioData.length
+      }
+    };
+    setErrorBanner(errorInfo);
+    console.error('Error:', errorInfo);
+  };
+
+  const copyTechnicalDetails = () => {
+    if (!errorBanner) return;
+    
+    const details = `ERROR REPORT - ${errorBanner.timestamp}
+Message: ${errorBanner.message}
+Workflow: ${errorBanner.details.workflow}
+Tab: ${errorBanner.details.tab}
+Currency: ${errorBanner.details.currency}
+Portfolio Size: ${errorBanner.details.portfolioCount}
+Stack: ${errorBanner.details.stack}`;
+
+    navigator.clipboard.writeText(details).then(() => {
+      alert('Error details copied to clipboard');
+    }).catch(() => {
+      console.log('Clipboard not available');
+    });
+  };
+
+  // Error Banner Component
+  const ErrorBanner = () => {
+    if (!errorBanner) return null;
+
+    return (
+      <div className="fixed top-0 left-0 right-0 bg-red-600 text-white p-3 z-50">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <div className="flex items-center">
+            <AlertCircle size={18} className="mr-2" />
+            <span className="text-sm">{errorBanner.message}</span>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={copyTechnicalDetails}
+              className="bg-red-700 px-2 py-1 rounded text-xs"
+            >
+              Copy Details
+            </button>
+            <button
+              onClick={() => setErrorBanner(null)}
+              className="text-red-200 hover:text-white"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Currency Flag Toggle Component
   const CurrencyToggle = () => {
@@ -795,101 +657,701 @@ const PortfolioApp = () => {
     );
   };
 
-  // Simple placeholder tabs (keeping existing working tabs)
-  const OverviewTab = () => (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold text-center mb-6">Overview</h2>
-      <p>Overview content will be here</p>
-    </div>
-  );
+  // ENHANCED OVERVIEW TAB
+  const OverviewTab = () => {
+    const [brokerageFilter, setBrokerageFilter] = useState('All');
+    const [accountFilter, setAccountFilter] = useState('All');
+    const [sortBy, setSortBy] = useState('symbol');
 
-  const SectorBreakdownTab = () => (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold text-center mb-6">Sectors</h2>
-      <p>Sector breakdown content will be here</p>
-    </div>
-  );
+    const uniqueBrokerages = [...new Set(portfolioData.map(stock => stock.brokerage))];
+    const uniqueAccountTypes = [...new Set(portfolioData.map(stock => stock.accountType))];
 
-  const DividendTab = () => (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold text-center mb-6">Dividends</h2>
-      <p>Dividend content will be here</p>
-    </div>
-  );
+    const filteredData = portfolioData.filter(stock => {
+      const brokerageMatch = brokerageFilter === 'All' || stock.brokerage === brokerageFilter;
+      const accountMatch = accountFilter === 'All' || stock.accountType === accountFilter;
+      return brokerageMatch && accountMatch;
+    });
 
-  const ExportTab = () => (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold text-center mb-6">Export</h2>
-      <p>Export functionality will be here</p>
-    </div>
-  );
+    const sortedData = [...filteredData].sort((a, b) => {
+      switch (sortBy) {
+        case 'symbol':
+          return a.symbol.localeCompare(b.symbol);
+        case 'value':
+          const aValueUSD = convertToDisplayCurrency(a.currentValue, a.currency);
+          const bValueUSD = convertToDisplayCurrency(b.currentValue, b.currency);
+          return bValueUSD - aValueUSD;
+        case 'performance':
+          const aReturn = (a.gainLoss / a.originalInvestment) * 100;
+          const bReturn = (b.gainLoss / b.originalInvestment) * 100;
+          return bReturn - aReturn;
+        default:
+          return 0;
+      }
+    });
 
-  const SettingsTab = () => (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold text-center mb-6">Settings</h2>
-      <p>Settings will be here</p>
-    </div>
-  );
+    const StockCard = ({ stock }) => {
+      const currentValueDisplay = convertToDisplayCurrency(stock.currentValue, stock.currency);
+      const gainLossDisplay = convertToDisplayCurrency(stock.gainLoss, stock.currency);
+      const returnPct = (stock.gainLoss / stock.originalInvestment) * 100;
 
-  const UpdatePriceTab = () => (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold text-center mb-6">Updates</h2>
-      <p>Update functionality will be here</p>
-    </div>
-  );
+      return (
+        <div className="bg-white border rounded-lg p-4 shadow-sm">
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <h3 className="font-bold text-lg">{stock.symbol}</h3>
+              <p className="text-sm text-gray-600">
+                {stock.sector} • {stock.accountType}
+              </p>
+              <p className="text-xs text-blue-600 font-medium">
+                {stock.brokerage}
+              </p>
+              <p className="text-sm">
+                {stock.currentShares.toFixed(2)} shares @ {stock.currency} ${stock.currentPrice.toFixed(2)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="font-bold">{formatCurrency(currentValueDisplay, displayCurrency)}</p>
+              <p className={`text-sm font-medium ${gainLossDisplay >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {gainLossDisplay >= 0 ? '+' : ''}{formatCurrency(Math.abs(gainLossDisplay), displayCurrency)}
+              </p>
+              <p className={`text-xs ${gainLossDisplay >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                ({returnPct.toFixed(1)}%)
+              </p>
+            </div>
+          </div>
+          
+          <div className="text-xs text-gray-500 mt-2 flex justify-between">
+            <span>Updated: {stock.lastUpdated}</span>
+            <span>Purchased: {stock.purchaseDate}</span>
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="p-4">
+        <h2 className="text-2xl font-bold text-center mb-6">Investment Overview</h2>
+        
+        <div className="bg-gray-100 rounded-lg p-4 mb-6">
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Filter by Brokerage:</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setBrokerageFilter('All')}
+                className={`px-3 py-1 rounded text-sm ${
+                  brokerageFilter === 'All' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-white text-gray-700 border'
+                }`}
+              >
+                All ({portfolioData.length})
+              </button>
+              {uniqueBrokerages.map(brokerage => {
+                const count = portfolioData.filter(stock => stock.brokerage === brokerage).length;
+                return (
+                  <button
+                    key={brokerage}
+                    onClick={() => setBrokerageFilter(brokerage)}
+                    className={`px-3 py-1 rounded text-sm ${
+                      brokerageFilter === brokerage 
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-white text-gray-700 border'
+                    }`}
+                  >
+                    {brokerage} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Filter by Account:</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setAccountFilter('All')}
+                className={`px-3 py-1 rounded text-sm ${
+                  accountFilter === 'All' 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-white text-gray-700 border'
+                }`}
+              >
+                All
+              </button>
+              {uniqueAccountTypes.map(accountType => (
+                <button
+                  key={accountType}
+                  onClick={() => setAccountFilter(accountType)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    accountFilter === accountType 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-white text-gray-700 border'
+                  }`}
+                >
+                  {accountType}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Sort by:</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full p-2 border rounded text-sm"
+            >
+              <option value="symbol">Symbol (A-Z)</option>
+              <option value="value">Value (High-Low)</option>
+              <option value="performance">Performance (Best-Worst)</option>
+            </select>
+          </div>
+
+          <div className="mt-4 text-sm text-gray-600">
+            Showing {filteredData.length} of {portfolioData.length} holdings
+            {brokerageFilter !== 'All' && ` • ${brokerageFilter}`}
+            {accountFilter !== 'All' && ` • ${accountFilter}`}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {sortedData.map((stock) => (
+            <StockCard key={stock.symbol} stock={stock} />
+          ))}
+          
+          {/* Cash Positions */}
+          {cashPositions.length > 0 && (
+            <div className="bg-gray-100 border rounded-lg p-4">
+              <h3 className="font-bold text-lg mb-3">Cash Positions</h3>
+              {cashPositions.map((cash) => {
+                const displayValue = convertToDisplayCurrency(cash.amount, cash.currency);
+                return (
+                  <div key={cash.currency} className="flex justify-between items-center py-2">
+                    <div>
+                      <span className="font-medium">{cash.currency} Cash</span>
+                      <p className="text-sm text-gray-600">
+                        Rate: {cash.currency === 'CAD' ? `1 CAD = ${CAD_TO_USD_RATE.toFixed(4)} USD` : '1:1'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold">{cash.currency} ${cash.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                      <p className="text-sm text-gray-600">
+                        ≈ {formatCurrency(displayValue, displayCurrency)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // SECTOR BREAKDOWN TAB
+  const SectorBreakdownTab = () => {
+    const sectorData = portfolioData.reduce((acc, stock) => {
+      const valueDisplay = convertToDisplayCurrency(stock.currentValue, stock.currency);
+      
+      if (!acc[stock.sector]) {
+        acc[stock.sector] = {
+          value: 0,
+          stocks: [],
+          count: 0
+        };
+      }
+      
+      acc[stock.sector].value += valueDisplay;
+      acc[stock.sector].stocks.push(stock);
+      acc[stock.sector].count += 1;
+      
+      return acc;
+    }, {});
+
+    const totalPortfolioValue = Object.values(sectorData).reduce((sum, sector) => sum + sector.value, 0);
+
+    const pieChartData = Object.entries(sectorData).map(([sector, data], index) => ({
+      name: sector,
+      value: data.value,
+      percentage: (data.value / totalPortfolioValue) * 100,
+      count: data.count,
+      stocks: data.stocks
+    })).sort((a, b) => b.value - a.value);
+
+    const SECTOR_COLORS = [
+      '#2563eb', '#dc2626', '#16a34a', '#ca8a04', '#9333ea', 
+      '#ea580c', '#0891b2', '#be185d', '#65a30d', '#7c3aed'
+    ];
+
+    const CustomTooltip = ({ active, payload }) => {
+      if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+          <div className="bg-white p-3 border rounded-lg shadow-lg">
+            <p className="font-semibold">{data.name}</p>
+            <p className="text-sm">Value: {formatCurrency(data.value, displayCurrency)}</p>
+            <p className="text-sm">Percentage: {data.percentage.toFixed(1)}%</p>
+            <p className="text-sm">Holdings: {data.count}</p>
+          </div>
+        );
+      }
+      return null;
+    };
+
+    const handleSectorClick = (sector) => {
+      setSelectedSector(sector);
+    };
+
+    const handleBackToMain = () => {
+      setSelectedSector(null);
+    };
+
+    if (!selectedSector) {
+      return (
+        <div className="p-4">
+          <h2 className="text-2xl font-bold text-center mb-6">Sector Breakdown</h2>
+          
+          <div className="bg-white rounded-lg p-4 mb-6 shadow-sm">
+            <ResponsiveContainer width="100%" height={300}>
+              <RechartsPieChart>
+                <Pie
+                  data={pieChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={120}
+                  paddingAngle={2}
+                  dataKey="value"
+                  onClick={(data) => handleSectorClick(data)}
+                  className="cursor-pointer"
+                >
+                  {pieChartData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={SECTOR_COLORS[index % SECTOR_COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </RechartsPieChart>
+            </ResponsiveContainer>
+            
+            <p className="text-center text-sm text-gray-600 mt-2">
+              Tap any sector to see individual holdings
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {pieChartData.map((sector, index) => (
+              <div 
+                key={sector.name} 
+                className="bg-white border rounded-lg p-4 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => handleSectorClick(sector)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div 
+                      className="w-4 h-4 rounded mr-3"
+                      style={{ backgroundColor: SECTOR_COLORS[index % SECTOR_COLORS.length] }}
+                    ></div>
+                    <div>
+                      <h3 className="font-bold text-lg">{sector.name}</h3>
+                      <p className="text-sm text-gray-600">{sector.count} holdings</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold">{formatCurrency(sector.value, displayCurrency)}</p>
+                    <p className="text-sm text-gray-600">({sector.percentage.toFixed(1)}%)</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-4">
+        <div className="flex items-center mb-6">
+          <button 
+            onClick={handleBackToMain}
+            className="mr-3 p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold">{selectedSector.name}</h2>
+            <p className="text-sm text-gray-600">
+              {formatCurrency(selectedSector.value, displayCurrency)} 
+              ({selectedSector.percentage.toFixed(1)}% of portfolio)
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {selectedSector.stocks
+            .sort((a, b) => {
+              const aValue = convertToDisplayCurrency(a.currentValue, a.currency);
+              const bValue = convertToDisplayCurrency(b.currentValue, b.currency);
+              return bValue - aValue;
+            })
+            .map((stock) => {
+              const currentValueDisplay = convertToDisplayCurrency(stock.currentValue, stock.currency);
+              const gainLossDisplay = convertToDisplayCurrency(stock.gainLoss, stock.currency);
+              const returnPct = (stock.gainLoss / stock.originalInvestment) * 100;
+              const sectorAllocation = (currentValueDisplay / selectedSector.value) * 100;
+              
+              return (
+                <div key={stock.symbol} className="bg-white border rounded-lg p-4 shadow-sm">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="font-bold text-lg">{stock.symbol}</h3>
+                      <p className="text-sm text-gray-600">
+                        {stock.currentShares.toFixed(2)} shares @ {stock.currency} ${stock.currentPrice.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {sectorAllocation.toFixed(1)}% of {selectedSector.name}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold">{formatCurrency(currentValueDisplay, displayCurrency)}</p>
+                      <p className={`text-sm font-medium ${gainLossDisplay >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {gainLossDisplay >= 0 ? '+' : ''}{formatCurrency(Math.abs(gainLossDisplay), displayCurrency)}
+                      </p>
+                      <p className={`text-xs ${gainLossDisplay >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        ({returnPct.toFixed(1)}%)
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full" 
+                      style={{ width: `${sectorAllocation}%` }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
+        <div className="mt-6 bg-gray-100 rounded-lg p-4">
+          <h3 className="font-bold mb-2">Sector Summary</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-gray-600">Total Value</p>
+              <p className="font-bold">{formatCurrency(selectedSector.value, displayCurrency)}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Portfolio Weight</p>
+              <p className="font-bold">{selectedSector.percentage.toFixed(1)}%</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Number of Holdings</p>
+              <p className="font-bold">{selectedSector.count}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Average Holding</p>
+              <p className="font-bold">{formatCurrency(selectedSector.value / selectedSector.count, displayCurrency)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ENHANCED DIVIDEND TAB
+  const DividendTab = () => {
+    const [dividendForm, setDividendForm] = useState({
+      symbol: '',
+      dividendAmount: '',
+      sharesReceived: '',
+      currency: 'USD'
+    });
+
+    const [showAddForm, setShowAddForm] = useState(false);
+
+    // Calculate dividend metrics
+    const calculateDividendMetrics = () => {
+      const currentYear = new Date().getFullYear();
+      
+      let totalDividendsDisplay = 0;
+      let totalPortfolioValueDisplay = 0;
+      let dividendPayingStocks = [];
+      
+      portfolioData.forEach(stock => {
+        const dividendDisplay = convertToDisplayCurrency(stock.dividendReceived, stock.currency);
+        const currentValueDisplay = convertToDisplayCurrency(stock.currentValue, stock.currency);
+        
+        totalDividendsDisplay += dividendDisplay;
+        totalPortfolioValueDisplay += currentValueDisplay;
+        
+        if (stock.dividendReceived > 0) {
+          const currentYield = stock.originalInvestment > 0 
+            ? (stock.dividendReceived / stock.originalInvestment) * 100 
+            : 0;
+            
+          dividendPayingStocks.push({
+            ...stock,
+            dividendDisplay,
+            currentValueDisplay,
+            currentYield,
+            annualEstimate: dividendDisplay * 4 // Rough quarterly estimation
+          });
+        }
+      });
+
+      // Calculate weighted average yield
+      const portfolioYield = totalPortfolioValueDisplay > 0 
+        ? (totalDividendsDisplay / totalPortfolioValueDisplay) * 100 
+        : 0;
+
+      // Market benchmark (typical dividend yield range)
+      const marketBenchmark = 2.1; // Average market dividend yield
+
+      return {
+        totalDividendsDisplay,
+        portfolioYield,
+        marketBenchmark,
+        dividendPayingStocks: dividendPayingStocks.sort((a, b) => b.currentYield - a.currentYield),
+        projectedAnnual: totalDividendsDisplay * 4,
+        previousYearEstimate: totalDividendsDisplay * 3.8 // Simulated previous year
+      };
+    };
+
+    const dividendMetrics = calculateDividendMetrics();
+
+    const handleAddDividend = () => {
+      if (!dividendForm.symbol || !dividendForm.dividendAmount) return;
+      
+      const updatedData = portfolioData.map(stock => {
+        if (stock.symbol === dividendForm.symbol) {
+          const newDividendAmount = parseFloat(dividendForm.dividendAmount) || 0;
+          const newShares = parseFloat(dividendForm.sharesReceived) || 0;
+          
+          return {
+            ...stock,
+            dividendReceived: stock.dividendReceived + newDividendAmount,
+            currentShares: stock.currentShares + newShares,
+            currentValue: (stock.currentShares + newShares) * stock.currentPrice
+          };
+        }
+        return stock;
+      });
+      
+      updatePortfolioData(updatedData);
+      setDividendForm({ symbol: '', dividendAmount: '', sharesReceived: '', currency: 'USD' });
+      setShowAddForm(false);
+    };
+
+    return (
+      <div className="p-4 space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Dividend Management</h2>
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors"
+          >
+            {showAddForm ? 'Cancel' : 'Add Dividend'}
+          </button>
+        </div>
+
+        {/* Add Dividend Form */}
+        {showAddForm && (
+          <div className="bg-white border rounded-lg p-4 shadow-sm">
+            <h3 className="font-bold mb-4">Add Dividend</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Stock Symbol</label>
+                <select
+                  value={dividendForm.symbol}
+                  onChange={(e) => setDividendForm(prev => ({ ...prev, symbol: e.target.value }))}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="">Select Stock</option>
+                  {portfolioData.map(stock => (
+                    <option key={stock.symbol} value={stock.symbol}>{stock.symbol}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Dividend Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={dividendForm.dividendAmount}
+                    onChange={(e) => setDividendForm(prev => ({ ...prev, dividendAmount: e.target.value }))}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="0.00"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Shares Received (Optional)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={dividendForm.sharesReceived}
+                    onChange={(e) => setDividendForm(prev => ({ ...prev, sharesReceived: e.target.value }))}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              
+              <button
+                onClick={handleAddDividend}
+                className="w-full bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700 transition-colors"
+              >
+                Add Dividend
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* 1. TOTAL DIVIDEND INCOME CARD */}
+        <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-6 shadow-md">
+          <h3 className="font-bold text-lg text-green-800 mb-4">Total Dividend Income</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <p className="text-sm text-green-600 mb-1">Year-to-Date</p>
+              <p className="text-2xl font-bold text-green-900">
+                {formatCurrency(dividendMetrics.totalDividendsDisplay, displayCurrency)}
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <p className="text-sm text-green-600 mb-1">Previous Year (Est.)</p>
+              <p className="text-xl font-bold text-green-800">
+                {formatCurrency(dividendMetrics.previousYearEstimate, displayCurrency)}
+              </p>
+              <p className="text-xs text-green-600">
+                {dividendMetrics.totalDividendsDisplay > dividendMetrics.previousYearEstimate ? '+' : ''}
+                {(((dividendMetrics.totalDividendsDisplay - dividendMetrics.previousYearEstimate) / dividendMetrics.previousYearEstimate) * 100).toFixed(1)}% YoY
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <p className="text-sm text-green-600 mb-1">Projected Annual</p>
+              <p className="text-xl font-bold text-green-800">
+                {formatCurrency(dividendMetrics.projectedAnnual, displayCurrency)}
+              </p>
+              <p className="text-xs text-green-600">Based on current rate</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. DIVIDEND YIELD TRACKING CARD */}
+        <div className="bg-white border rounded-lg p-4 shadow-md">
+          <h3 className="font-bold text-lg mb-4">Dividend Yield Tracking</h3>
+          
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="text-sm text-gray-600 mb-2">Portfolio Yield</p>
+              <p className="text-3xl font-bold text-blue-900">
+                {dividendMetrics.portfolioYield.toFixed(2)}%
+              </p>
+              <p className="text-sm text-gray-500">Weighted average</p>
+            </div>
+            
+            <div>
+              <p className="text-sm text-gray-600 mb-2">vs. Market Benchmark</p>
+              <p className="text-2xl font-bold text-gray-700">
+                {dividendMetrics.marketBenchmark.toFixed(1)}%
+              </p>
+              <p className={`text-sm font-medium ${
+                dividendMetrics.portfolioYield > dividendMetrics.marketBenchmark 
+                  ? 'text-green-600' 
+                  : 'text-red-600'
+              }`}>
+                {dividendMetrics.portfolioYield > dividendMetrics.marketBenchmark ? 'Above' : 'Below'} market average
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Portfolio vs. Market</span>
+              <span className={`font-bold ${
+                dividendMetrics.portfolioYield > dividendMetrics.marketBenchmark 
+                  ? 'text-green-600' 
+                  : 'text-red-600'
+              }`}>
+                {dividendMetrics.portfolioYield > dividendMetrics.marketBenchmark ? '+' : ''}
+                {(dividendMetrics.portfolioYield - dividendMetrics.marketBenchmark).toFixed(2)}%
+              </span>
+            </div>
+            
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full" 
+                style={{ 
+                  width: `${Math.min((dividendMetrics.portfolioYield / (dividendMetrics.marketBenchmark * 2)) * 100, 100)}%` 
+                }}
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. INDIVIDUAL STOCK DIVIDENDS CARD */}
+        <div className="bg-white border rounded-lg p-4 shadow-md">
+          <h3 className="font-bold text-lg mb-4">Individual Stock Dividends</h3>
+          
+          {dividendMetrics.dividendPayingStocks.length > 0 ? (
+            <div className="space-y-3">
+              {dividendMetrics.dividendPayingStocks.map(stock => (
+                <div key={stock.symbol} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <h4 className="font-bold text-lg">{stock.symbol}</h4>
+                    <p className="text-sm text-gray-600">{stock.sector}</p>
+                    <p className="text-xs text-gray-500">
+                      {stock.currentShares.toFixed(2)} shares
+                    </p>
+                  </div>
+                  
+                  <div className="text-right">
+                    <p className="font-bold text-green-600">
+                      {formatCurrency(stock.dividendDisplay, displayCurrency)}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Yield: {stock.currentYield.toFixed(2)}%
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Est. Annual: {formatCurrency(stock.annualEstimate, displayCurrency)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No dividend payments recorded yet</p>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
+              >
+                Add your first dividend
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // Side Menu Component
   const SideMenu = () => {
     const menuItems = [
-      { 
-        id: 'portfolio', 
-        icon: BarChart3, 
-        label: 'Portfolio', 
-        available: true,
-        description: 'View and manage your investments'
-      },
-      { 
-        id: 'export', 
-        icon: Download, 
-        label: 'Export', 
-        available: true,
-        description: 'Export portfolio data'
-      },
-      { 
-        id: 'update', 
-        icon: RefreshCw, 
-        label: 'Update', 
-        available: true,
-        description: 'Manual updates and data management'
-      },
-      { 
-        id: 'settings', 
-        icon: Settings, 
-        label: 'Settings', 
-        available: true,
-        description: 'App configuration and security'
-      },
-      { 
-        id: 'watchlist', 
-        icon: Eye, 
-        label: 'Watchlist', 
-        available: false,
-        description: 'Coming in Phase 2'
-      },
-      { 
-        id: 'news', 
-        icon: Newspaper, 
-        label: 'News', 
-        available: false,
-        description: 'Coming in Phase 3'
-      },
-      { 
-        id: 'transactions', 
-        icon: CreditCard, 
-        label: 'Transactions', 
-        available: false,
-        description: 'Coming in Phase 8'
-      }
+      { id: 'portfolio', icon: BarChart3, label: 'Portfolio', available: true },
+      { id: 'export', icon: Download, label: 'Export', available: true },
+      { id: 'update', icon: RefreshCw, label: 'Update', available: true },
+      { id: 'settings', icon: Settings, label: 'Settings', available: true }
     ];
 
     const handleWorkflowChange = (workflowId) => {
@@ -904,7 +1366,6 @@ const PortfolioApp = () => {
 
     return (
       <>
-        {/* Overlay */}
         {sideMenuOpen && (
           <div 
             className="fixed inset-0 bg-black bg-opacity-50 z-40"
@@ -912,63 +1373,44 @@ const PortfolioApp = () => {
           />
         )}
         
-        {/* Side Menu */}
         <div className={`fixed left-0 top-0 h-full w-80 bg-white shadow-lg transform transition-transform duration-300 z-50 ${
           sideMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
           <div className="flex items-center justify-between p-4 border-b">
             <h2 className="text-xl font-bold">Portfolio App</h2>
-            <button
-              onClick={() => setSideMenuOpen(false)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
+            <button onClick={() => setSideMenuOpen(false)} className="p-2">
               <X size={20} />
             </button>
           </div>
           
-          <div className="p-4">
-            <h3 className="font-medium text-gray-600 mb-4 text-sm uppercase tracking-wide">
-              Primary Workflows
-            </h3>
-            
-            <div className="space-y-2">
-              {menuItems.map(item => {
-                const Icon = item.icon;
-                const isActive = activeWorkflow === item.id;
-                const isAvailable = item.available;
-                
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleWorkflowChange(item.id)}
-                    disabled={!isAvailable}
-                    className={`w-full flex items-center p-3 rounded-lg text-left transition-colors ${
-                      isActive && isAvailable
-                        ? 'bg-blue-100 text-blue-600 border border-blue-200' 
-                        : isAvailable
-                        ? 'hover:bg-gray-100 text-gray-700'
-                        : 'text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <Icon size={20} className="mr-3" />
-                    <div className="flex-1">
-                      <div className="font-medium">{item.label}</div>
-                      <div className="text-xs text-gray-500">{item.description}</div>
-                    </div>
-                    {!isAvailable && (
-                      <span className="text-xs bg-gray-200 px-2 py-1 rounded">Soon</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="p-4 space-y-2">
+            {menuItems.map(item => {
+              const Icon = item.icon;
+              const isActive = activeWorkflow === item.id;
+              
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleWorkflowChange(item.id)}
+                  className={`w-full flex items-center p-3 rounded-lg text-left transition-colors ${
+                    isActive 
+                      ? 'bg-blue-100 text-blue-600 border border-blue-200' 
+                      : 'hover:bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  <Icon size={20} className="mr-3" />
+                  <div className="flex-1">
+                    <div className="font-medium">{item.label}</div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-          
-          {/* Footer */}
+
           <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-gray-50">
             <div className="text-xs text-gray-500">
               <p>Portfolio PWA v1.0</p>
-              <p>Phase 1: Core Foundation</p>
+              <p>Phase 1: Complete</p>
               <p className="mt-1">
                 Total: {formatCurrency(metrics.totalCurrentUSD, 'USD')}
               </p>
@@ -981,10 +1423,7 @@ const PortfolioApp = () => {
 
   // Navigation Component
   const Navigation = () => {
-    // Only show bottom tabs when Portfolio workflow is active
-    if (activeWorkflow !== 'portfolio') {
-      return null;
-    }
+    if (activeWorkflow !== 'portfolio') return null;
 
     const tabs = [
       { id: 'dashboard', icon: TrendingUp, label: 'Dashboard' },
@@ -1036,17 +1475,11 @@ const PortfolioApp = () => {
           default:
             return <DashboardTab />;
         }
-      case 'export':
-        return <ExportTab />;
-      case 'update':
-        return <UpdatePriceTab />;
-      case 'settings':
-        return <SettingsTab />;
       default:
         return (
           <div className="p-4 text-center">
-            <h2 className="text-2xl font-bold mb-4">Feature Coming Soon</h2>
-            <p className="text-gray-600">This feature will be available in a future phase.</p>
+            <h2 className="text-2xl font-bold mb-4">{activeWorkflow}</h2>
+            <p className="text-gray-600">Feature coming soon</p>
           </div>
         );
     }
@@ -1055,11 +1488,15 @@ const PortfolioApp = () => {
   // Main App Component
   return (
     <div className="max-w-md mx-auto bg-gray-50 min-h-screen flex flex-col pb-20">
-      {/* Side Menu */}
+      <ErrorBanner />
       <SideMenu />
       
-      {/* Header with Currency Toggle */}
-      <div style={{backgroundColor: '#2563eb', color: 'white', padding: '1rem'}}>
+      <div style={{
+        backgroundColor: '#2563eb', 
+        color: 'white', 
+        padding: '1rem',
+        marginTop: errorBanner ? '60px' : '0'
+      }}>
         <div className="flex items-center justify-between">
           <button
             onClick={() => setSideMenuOpen(true)}
@@ -1069,34 +1506,23 @@ const PortfolioApp = () => {
           </button>
           
           <div className="text-center flex-1">
-            <h1 className="text-xl font-bold">
-              {activeWorkflow === 'portfolio' ? 'Portfolio' : 
-               activeWorkflow === 'export' ? 'Export' :
-               activeWorkflow === 'update' ? 'Update' :
-               activeWorkflow === 'settings' ? 'Settings' : 'Portfolio App'}
-            </h1>
-            {activeWorkflow === 'portfolio' && (
-              <>
-                <p className="text-sm opacity-90">
-                  Total: {formatCurrency(metrics.totalCurrentUSD, 'USD')}
-                </p>
-                <p className="text-xs opacity-75">
-                  1 CAD = ${CAD_TO_USD_RATE.toFixed(4)} USD
-                </p>
-              </>
-            )}
+            <h1 className="text-xl font-bold">Portfolio</h1>
+            <p className="text-sm opacity-90">
+              Total: {formatCurrency(metrics.totalCurrentUSD, 'USD')}
+            </p>
+            <p className="text-xs opacity-75">
+              1 CAD = ${CAD_TO_USD_RATE.toFixed(4)} USD
+            </p>
           </div>
           
           <CurrencyToggle />
         </div>
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 overflow-y-auto">
         {renderContent()}
       </div>
 
-      {/* Navigation - Only shows for Portfolio workflow */}
       <Navigation />
     </div>
   );
