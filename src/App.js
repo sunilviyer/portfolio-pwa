@@ -517,6 +517,9 @@ const PortfolioApp = () => {
   const [activeWorkflow, setActiveWorkflow] = useState('portfolio');
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
   const [selectedSector, setSelectedSector] = useState(null);
+  const [displayCurrency, setDisplayCurrency] = useState(() => 
+    loadFromLocalStorage('displayCurrency', 'USD')
+  );
 
   // API Update States
   const [isUpdating, setIsUpdating] = useState(false);
@@ -595,6 +598,30 @@ const PortfolioApp = () => {
   };
 
   const CAD_TO_USD_RATE = getCurrentExchangeRate();
+  const USD_TO_CAD_RATE = 1 / CAD_TO_USD_RATE;
+
+  // Currency display helper functions
+  const convertToDisplayCurrency = (amount, fromCurrency) => {
+    if (displayCurrency === fromCurrency) return amount;
+    
+    if (displayCurrency === 'USD' && fromCurrency === 'CAD') {
+      return amount * CAD_TO_USD_RATE;
+    } else if (displayCurrency === 'CAD' && fromCurrency === 'USD') {
+      return amount * USD_TO_CAD_RATE;
+    }
+    return amount;
+  };
+
+  const formatCurrency = (amount, fromCurrency = 'USD') => {
+    const convertedAmount = convertToDisplayCurrency(amount, fromCurrency);
+    return `${displayCurrency} ${convertedAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+  };
+
+  // Handle currency switch
+  const handleCurrencySwitch = (newCurrency) => {
+    setDisplayCurrency(newCurrency);
+    saveToLocalStorage('displayCurrency', newCurrency);
+  };
 
   // Constants
   const SECTORS = [
@@ -643,67 +670,105 @@ const PortfolioApp = () => {
     }
   };
 
-  // Calculate portfolio metrics
+  // Calculate portfolio metrics with display currency
   const calculatePortfolioMetrics = () => {
-    let totalOriginalUSD = 0;
-    let totalCurrentUSD = 0;
-    let totalDividendsUSD = 0;
+    let totalOriginalDisplay = 0;
+    let totalCurrentDisplay = 0;
+    let totalDividendsDisplay = 0;
 
     portfolioData.forEach(stock => {
-      const conversionRate = stock.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
-      totalOriginalUSD += stock.originalInvestment * conversionRate;
-      totalCurrentUSD += stock.currentValue * conversionRate;
-      totalDividendsUSD += stock.dividendReceived * conversionRate;
+      if (stock) {
+        const originalDisplay = convertToDisplayCurrency(stock.originalInvestment || 0, stock.currency);
+        const currentDisplay = convertToDisplayCurrency(stock.currentValue || 0, stock.currency);
+        const dividendsDisplay = convertToDisplayCurrency(stock.dividendReceived || 0, stock.currency);
+        
+        totalOriginalDisplay += originalDisplay;
+        totalCurrentDisplay += currentDisplay;
+        totalDividendsDisplay += dividendsDisplay;
+      }
     });
 
+    // Add cash positions
     cashPositions.forEach(cash => {
-      const conversionRate = cash.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
-      totalCurrentUSD += cash.amount * conversionRate;
+      if (cash) {
+        const cashDisplay = convertToDisplayCurrency(cash.amount || 0, cash.currency);
+        totalCurrentDisplay += cashDisplay;
+      }
     });
 
-    const totalReturn = totalCurrentUSD - totalOriginalUSD;
-    const returnPercentage = (totalReturn / totalOriginalUSD) * 100;
+    const totalReturn = totalCurrentDisplay - totalOriginalDisplay;
+    const returnPercentage = totalOriginalDisplay > 0 ? (totalReturn / totalOriginalDisplay) * 100 : 0;
 
     return {
-      totalOriginalUSD,
-      totalCurrentUSD,
-      totalDividendsUSD,
-      totalReturn,
-      returnPercentage
+      totalOriginalDisplay: totalOriginalDisplay || 0,
+      totalCurrentDisplay: totalCurrentDisplay || 0,
+      totalDividendsDisplay: totalDividendsDisplay || 0,
+      totalReturn: totalReturn || 0,
+      returnPercentage: returnPercentage || 0
     };
   };
 
   const metrics = calculatePortfolioMetrics();
+
+  // Currency Flag Toggle Component
+  const CurrencyToggle = () => {
+    return (
+      <div className="flex items-center space-x-2">
+        <div className={`flex items-center transition-opacity duration-200 ${
+          displayCurrency === 'CAD' ? 'opacity-100' : 'opacity-50'
+        }`}>
+          <span className="text-2xl mr-1">🇨🇦</span>
+        </div>
+        
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={displayCurrency === 'USD'}
+            onChange={(e) => handleCurrencySwitch(e.target.checked ? 'USD' : 'CAD')}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-blue-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-400"></div>
+        </label>
+        
+        <div className={`flex items-center transition-opacity duration-200 ${
+          displayCurrency === 'USD' ? 'opacity-100' : 'opacity-50'
+        }`}>
+          <span className="text-2xl ml-1">🇺🇸</span>
+        </div>
+      </div>
+    );
+  };
 
   // Dashboard Tab Component (renamed from Performance)
   const DashboardTab = () => {
     // Calculate daily performance change (simulated - in production would use real previous close data)
     const calculateDailyPerformance = () => {
       // For now, simulate daily change - in production this would use real previous close data
-      let totalCurrentUSD = 0;
-      let totalPreviousCloseUSD = 0;
+      let totalCurrentDisplay = 0;
+      let totalPreviousCloseDisplay = 0;
       
       portfolioData.forEach(stock => {
-        const conversionRate = stock.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
-        totalCurrentUSD += stock.currentValue * conversionRate;
+        const currentDisplay = convertToDisplayCurrency(stock.currentValue, stock.currency);
+        totalCurrentDisplay += currentDisplay;
         // Simulate previous close (in production, would fetch real previous close prices)
         const simulatedDailyChange = (Math.random() - 0.5) * 0.04; // +/- 2% daily change
         const simulatedPreviousValue = stock.currentValue / (1 + simulatedDailyChange);
-        totalPreviousCloseUSD += simulatedPreviousValue * conversionRate;
+        const simulatedPreviousDisplay = convertToDisplayCurrency(simulatedPreviousValue, stock.currency);
+        totalPreviousCloseDisplay += simulatedPreviousDisplay;
       });
 
       // Add cash positions to current value only (cash doesn't change daily)
       cashPositions.forEach(cash => {
-        const conversionRate = cash.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
-        totalCurrentUSD += cash.amount * conversionRate;
-        totalPreviousCloseUSD += cash.amount * conversionRate;
+        const cashDisplay = convertToDisplayCurrency(cash.amount, cash.currency);
+        totalCurrentDisplay += cashDisplay;
+        totalPreviousCloseDisplay += cashDisplay;
       });
 
-      const dailyChange = totalCurrentUSD - totalPreviousCloseUSD;
-      const dailyChangePercent = (dailyChange / totalPreviousCloseUSD) * 100;
+      const dailyChange = totalCurrentDisplay - totalPreviousCloseDisplay;
+      const dailyChangePercent = (dailyChange / totalPreviousCloseDisplay) * 100;
 
       return {
-        currentValue: totalCurrentUSD,
+        currentValue: totalCurrentDisplay,
         dailyChange,
         dailyChangePercent
       };
@@ -730,7 +795,7 @@ const PortfolioApp = () => {
             <p className={`text-4xl font-black mb-2 ${
               dailyPerformance.dailyChange >= 0 ? 'text-green-900' : 'text-red-900'
             }`}>
-              {dailyPerformance.dailyChange >= 0 ? '+' : ''}${dailyPerformance.dailyChange.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+              {dailyPerformance.dailyChange >= 0 ? '+' : ''}{formatCurrency(Math.abs(dailyPerformance.dailyChange), displayCurrency)}
             </p>
             <p className={`text-xl font-bold ${
               dailyPerformance.dailyChange >= 0 ? 'text-green-700' : 'text-red-700'
@@ -738,7 +803,7 @@ const PortfolioApp = () => {
               ({dailyPerformance.dailyChange >= 0 ? '+' : ''}{dailyPerformance.dailyChangePercent.toFixed(2)}%)
             </p>
             <p className="text-sm text-gray-600 mt-2">
-              Portfolio Value: ${dailyPerformance.currentValue.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+              Portfolio Value: {formatCurrency(dailyPerformance.currentValue, displayCurrency)}
             </p>
           </div>
         </div>
@@ -751,15 +816,14 @@ const PortfolioApp = () => {
               // Calculate simulated daily performance (in production would use real previous close data)
               const simulatedDailyChange = (Math.random() - 0.3) * 0.08; // Bias toward gains for demo
               const todayGainPercent = simulatedDailyChange * 100;
-              const conversionRate = stock.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
-              const currentValueUSD = stock.currentValue * conversionRate;
-              const todayGainUSD = currentValueUSD * simulatedDailyChange;
+              const currentValueDisplay = convertToDisplayCurrency(stock.currentValue, stock.currency);
+              const todayGainDisplay = currentValueDisplay * simulatedDailyChange;
               
               return {
                 ...stock,
                 todayGainPercent,
-                todayGainUSD,
-                conversionRate
+                todayGainDisplay,
+                currentValueDisplay
               };
             })
             .sort((a, b) => b.todayGainPercent - a.todayGainPercent)
@@ -781,8 +845,8 @@ const PortfolioApp = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className={`font-bold ${stock.todayGainUSD >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {stock.todayGainUSD >= 0 ? '+' : ''}${Math.abs(stock.todayGainUSD).toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+                    <span className={`font-bold ${stock.todayGainDisplay >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {stock.todayGainDisplay >= 0 ? '+' : ''}{formatCurrency(Math.abs(stock.todayGainDisplay), displayCurrency)}
                     </span>
                     <div className={`text-sm ${stock.todayGainPercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                       ({stock.todayGainPercent >= 0 ? '+' : ''}{stock.todayGainPercent.toFixed(2)}%)
@@ -805,13 +869,13 @@ const PortfolioApp = () => {
             <div>
               <p className="text-sm text-blue-600">Current Value</p>
               <p className="text-2xl font-bold text-blue-900">
-                ${metrics.totalCurrentUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+                {formatCurrency(metrics.totalCurrentDisplay, displayCurrency)}
               </p>
             </div>
             <div>
               <p className="text-sm text-blue-600">Total Return</p>
               <p className={`text-xl font-bold ${metrics.totalReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {metrics.totalReturn >= 0 ? '+' : ''}${metrics.totalReturn.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+                {metrics.totalReturn >= 0 ? '+' : ''}{formatCurrency(Math.abs(metrics.totalReturn), displayCurrency)}
               </p>
               <p className={`text-sm ${metrics.totalReturn >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                 ({metrics.returnPercentage.toFixed(1)}%)
@@ -820,8 +884,8 @@ const PortfolioApp = () => {
           </div>
           <div className="mt-3 pt-3 border-t border-blue-200">
             <div className="flex justify-between text-sm text-blue-700">
-              <span>Original Investment: ${metrics.totalOriginalUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD</span>
-              <span>Dividends: ${metrics.totalDividendsUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD</span>
+              <span>Original Investment: {formatCurrency(metrics.totalOriginalDisplay, displayCurrency)}</span>
+              <span>Dividends: {formatCurrency(metrics.totalDividendsDisplay, displayCurrency)}</span>
             </div>
           </div>
         </div>
@@ -837,8 +901,7 @@ const PortfolioApp = () => {
             })
             .slice(0, 3)
             .map((stock, index) => {
-              const conversionRate = stock.currency === 'CAD' ? CAD_TO_USD_RATE : 1;
-              const gainLossUSD = stock.gainLoss * conversionRate;
+              const gainLossDisplay = convertToDisplayCurrency(stock.gainLoss, stock.currency);
               const returnPct = (stock.gainLoss / stock.originalInvestment) * 100;
               
               return (
@@ -850,10 +913,10 @@ const PortfolioApp = () => {
                     <span className="font-medium">{stock.symbol}</span>
                   </div>
                   <div className="text-right">
-                    <span className={`font-bold ${gainLossUSD >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {gainLossUSD >= 0 ? '+' : ''}${gainLossUSD.toLocaleString('en-US', {minimumFractionDigits: 2})} USD
+                    <span className={`font-bold ${gainLossDisplay >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {gainLossDisplay >= 0 ? '+' : ''}{formatCurrency(Math.abs(gainLossDisplay), displayCurrency)}
                     </span>
-                    <div className={`text-sm ${gainLossUSD >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    <div className={`text-sm ${gainLossDisplay >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                       ({returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%)
                     </div>
                   </div>
@@ -3073,7 +3136,9 @@ const PortfolioApp = () => {
             </h1>
             {activeWorkflow === 'portfolio' && (
               <>
-                <p className="text-sm opacity-90">Total: ${metrics.totalCurrentUSD.toLocaleString('en-US', {minimumFractionDigits: 0})} USD</p>
+                <p className="text-sm opacity-90">
+                  Total: {formatCurrency(metrics.totalCurrentDisplay, displayCurrency)}
+                </p>
                 {isUpdating && (
                   <p className="text-xs opacity-75 mt-1">Updating prices + exchange rate...</p>
                 )}
@@ -3084,7 +3149,9 @@ const PortfolioApp = () => {
             )}
           </div>
           
-          <div className="w-10"></div> {/* Spacer for centering */}
+          <div className="flex items-center">
+            <CurrencyToggle />
+          </div>
         </div>
       </div>
 
