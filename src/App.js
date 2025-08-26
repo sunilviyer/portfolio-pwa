@@ -2376,7 +2376,7 @@ const PortfolioApp = () => {
               
               <button
                 onClick={() => {
-                  if (confirm('This will reset all settings to defaults. Continue?')) {
+                  if (window.confirm('This will reset all settings to defaults. Continue?')) {
                     localStorage.removeItem('appSettings');
                     setSettings({
                       currency: 'USD',
