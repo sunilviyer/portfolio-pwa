@@ -532,6 +532,62 @@ const PortfolioApp = () => {
     dateAdded: new Date().toISOString().split('T')[0]
   });
 
+  // Service Worker Registration
+  useEffect(() => {
+    // Register service worker for PWA functionality
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((registration) => {
+            console.log('SW registered: ', registration);
+            
+            // Listen for updates
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // New version available
+                  console.log('New app version available. Please refresh.');
+                }
+              });
+            });
+          })
+          .catch((registrationError) => {
+            console.log('SW registration failed: ', registrationError);
+          });
+      });
+
+      // Listen for messages from service worker
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        const { type, payload } = event.data;
+        
+        switch (type) {
+          case 'SYNC_COMPLETE':
+            console.log('Background sync completed');
+            // Optionally refresh portfolio data here
+            break;
+          default:
+            console.log('Unknown message from SW:', type);
+        }
+      });
+    }
+  }, []);
+
+  // Cache portfolio data when it updates (for offline access)
+  useEffect(() => {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'CACHE_PORTFOLIO_DATA',
+        payload: {
+          portfolioData,
+          cashPositions,
+          lastApiUpdate,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+  }, [portfolioData, cashPositions, lastApiUpdate]);
+
   // Conversion rate for display (use live rate from cash positions)
   const getCurrentExchangeRate = () => {
     const cadCash = cashPositions.find(cash => cash.currency === 'CAD');
