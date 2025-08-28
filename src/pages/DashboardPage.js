@@ -86,3 +86,5 @@ export const DashboardTab = ({ portfolioData, metrics, formatCurrency }) => {
     </div>
   );
 };
+
+export default DashboardTab;

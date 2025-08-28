@@ -1,72 +1,59 @@
 import React, { useState } from 'react';
 import { Menu } from 'lucide-react';
-import { DataMigrationTool } from './components/common/DataMigration';
 
-// Import your new modular components
-import { ErrorBanner } from './components/common/ErrorBanner';
-import { CurrencyToggle } from './components/common/CurrencyToggle';
-import { SideMenu } from './components/navigation/SideMenu';
-import { Navigation } from './components/navigation/Navigation';
+// Component imports - Add these one by one as you create the files
+import ErrorBanner from './components/common/ErrorBanner';
+import CurrencyToggle from './components/common/CurrencyToggle';
+import SideMenu from './components/navigation/SideMenu';
+import BottomNavigation from './components/navigation/BottomNavigation';
 
-// Import hooks
+// Page imports - Add these one by one
+import DashboardPage from './pages/DashboardPage';
+import OverviewPage from './pages/OverviewPage';
+import SectorsPage from './pages/SectorsPage';
+import DividendsPage from './pages/DividendsPage';
+import ExportPage from './pages/ExportPage';
+import UpdatePage from './pages/UpdatePage';
+import SettingsPage from './pages/SettingsPage';
+
+// Hook imports - Add these one by one
 import { usePortfolioData } from './hooks/usePortfolioData';
 import { useCurrencyConversion } from './hooks/useCurrencyConversion';
 
-// Import pages
-import { DashboardTab } from './pages/DashboardPage';
-import { OverviewTab } from './pages/OverviewPage';
-import { SectorBreakdownTab } from './pages/SectorsPage';
-// ... other pages
+// Utility imports
+import { calculatePortfolioMetrics } from './utils/calculations';
 
-function App() {
-  // Portfolio data management
-  const { portfolioData, cashPositions, updatePortfolioData, updateCashPositions, addDividend } = usePortfolioData();
-  
-  // Currency conversion
-  const { displayCurrency, setDisplayCurrency, exchangeRate, metrics, formatCurrency } = useCurrencyConversion(portfolioData, cashPositions);
+const App = () => {
+  // Custom hooks for data management
+  const {
+    portfolioData,
+    cashPositions,
+    updatePortfolioData,
+    updateCashPositions,
+    resetToInitialData
+  } = usePortfolioData();
 
-  // UI state
+  const {
+    displayCurrency,
+    convertToDisplayCurrency,
+    convertToUSD,
+    formatCurrency,
+    setDisplayCurrencyTo,
+    cadToUsdRate
+  } = useCurrencyConversion(cashPositions);
+
+  // Calculate portfolio metrics
+  const metrics = calculatePortfolioMetrics(
+    portfolioData,
+    cashPositions,
+    convertToUSD
+  );
+
+  // UI State
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeWorkflow, setActiveWorkflow] = useState('portfolio');
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
   const [errorBanner, setErrorBanner] = useState(null);
-
-  // ========== ADD MIGRATION STATE HERE ==========
-  const [migrationState, setMigrationState] = useState(() => {
-    // Check if migration already completed or skipped
-    if (localStorage.getItem('migrationCompleted')) return 'completed';
-    if (localStorage.getItem('migrationSkipped')) return 'skipped';
-    
-    // Check if migration is needed by examining existing data structure
-    const existingData = localStorage.getItem('portfolioData');
-    if (!existingData) return 'completed'; // No data = no migration needed
-    
-    try {
-      const data = JSON.parse(existingData);
-      // Check if data uses new model (has soldAmount field)
-      const hasNewFields = data[0]?.hasOwnProperty('soldAmount');
-      return hasNewFields ? 'completed' : 'needed';
-    } catch {
-      return 'completed'; // If data is corrupted, consider migration complete
-    }
-  });
-
-  // Migration handlers
-  const handleMigrationComplete = () => {
-    localStorage.setItem('migrationCompleted', 'true');
-    setMigrationState('completed');
-    window.location.reload(); // Reload to initialize with new data
-  };
-
-  const handleMigrationSkip = () => {
-    localStorage.setItem('migrationSkipped', 'true');
-    setMigrationState('skipped');
-  };
-
-  const handleStartMigration = () => {
-    setMigrationState('migrating');
-  };
-  // ========== END MIGRATION STATE ==========
 
   // Error handling
   const showErrorBanner = (error) => {
@@ -78,29 +65,12 @@ function App() {
         workflow: activeWorkflow,
         tab: activeTab,
         currency: displayCurrency,
-        portfolioCount: portfolioData.length
+        portfolioCount: portfolioData.length,
+        ...error.details
       }
     };
     setErrorBanner(errorInfo);
-    console.error('Error:', errorInfo);
-  };
-
-  const copyTechnicalDetails = () => {
-    if (!errorBanner) return;
-    
-    const details = `ERROR REPORT - ${errorBanner.timestamp}
-Message: ${errorBanner.message}
-Workflow: ${errorBanner.details.workflow}
-Tab: ${errorBanner.details.tab}
-Currency: ${errorBanner.details.currency}
-Portfolio Size: ${errorBanner.details.portfolioCount}
-Stack: ${errorBanner.details.stack}`;
-
-    navigator.clipboard.writeText(details).then(() => {
-      alert('Error details copied to clipboard');
-    }).catch(() => {
-      console.log('Clipboard not available');
-    });
+    console.error('Application Error:', errorInfo);
   };
 
   // Content renderer
@@ -109,125 +79,176 @@ Stack: ${errorBanner.details.stack}`;
       case 'portfolio':
         switch (activeTab) {
           case 'dashboard':
-            return <DashboardTab portfolioData={portfolioData} metrics={metrics} formatCurrency={formatCurrency} />;
+            return (
+              <DashboardPage
+                portfolioData={portfolioData}
+                metrics={metrics}
+                formatCurrency={formatCurrency}
+                convertToDisplayCurrency={convertToDisplayCurrency}
+                displayCurrency={displayCurrency}
+              />
+            );
           case 'overview':
-            return <OverviewTab portfolioData={portfolioData} cashPositions={cashPositions} />;
+            return (
+              <OverviewPage
+                portfolioData={portfolioData}
+                cashPositions={cashPositions}
+                convertToDisplayCurrency={convertToDisplayCurrency}
+                formatCurrency={formatCurrency}
+                displayCurrency={displayCurrency}
+              />
+            );
           case 'sectors':
-            return <SectorBreakdownTab portfolioData={portfolioData} />;
+            return (
+              <SectorsPage
+                portfolioData={portfolioData}
+                convertToDisplayCurrency={convertToDisplayCurrency}
+                formatCurrency={formatCurrency}
+                displayCurrency={displayCurrency}
+              />
+            );
           case 'dividends':
-            return <DividendsTab portfolioData={portfolioData} addDividend={addDividend} />;
+            return (
+              <DividendsPage
+                portfolioData={portfolioData}
+                updatePortfolioData={updatePortfolioData}
+                convertToDisplayCurrency={convertToDisplayCurrency}
+                formatCurrency={formatCurrency}
+                displayCurrency={displayCurrency}
+              />
+            );
           default:
-            return <DashboardTab portfolioData={portfolioData} metrics={metrics} formatCurrency={formatCurrency} />;
+            return (
+              <DashboardPage
+                portfolioData={portfolioData}
+                metrics={metrics}
+                formatCurrency={formatCurrency}
+                convertToDisplayCurrency={convertToDisplayCurrency}
+                displayCurrency={displayCurrency}
+              />
+            );
         }
-      // Other workflows...
+      
+      case 'export':
+        return (
+          <ExportPage
+            portfolioData={portfolioData}
+            cashPositions={cashPositions}
+            metrics={metrics}
+            formatCurrency={formatCurrency}
+          />
+        );
+      
+      case 'update':
+        return (
+          <UpdatePage
+            portfolioData={portfolioData}
+            cashPositions={cashPositions}
+            updatePortfolioData={updatePortfolioData}
+            updateCashPositions={updateCashPositions}
+            onError={showErrorBanner}
+          />
+        );
+      
+      case 'settings':
+        return (
+          <SettingsPage
+            displayCurrency={displayCurrency}
+            onCurrencyChange={setDisplayCurrencyTo}
+            portfolioData={portfolioData}
+            cashPositions={cashPositions}
+            onResetData={resetToInitialData}
+          />
+        );
+      
       default:
-        return <div>Feature coming soon</div>;
+        return (
+          <div className="p-4 text-center">
+            <h2 className="text-2xl font-bold mb-4">Feature Coming Soon</h2>
+            <p className="text-gray-600">This feature will be available in a future phase.</p>
+          </div>
+        );
+    }
+  };
+
+  // Get workflow title
+  const getWorkflowTitle = () => {
+    switch (activeWorkflow) {
+      case 'portfolio': return 'Portfolio';
+      case 'export': return 'Export';
+      case 'update': return 'Update';  
+      case 'settings': return 'Settings';
+      default: return 'Portfolio App';
     }
   };
 
   return (
     <div className="max-w-md mx-auto bg-gray-50 min-h-screen flex flex-col pb-20">
-      {/* ========== ADD MIGRATION BANNER HERE (before ErrorBanner) ========== */}
-      {migrationState === 'needed' && (
-        <div className="bg-yellow-50 p-4 border-b border-yellow-200 relative z-40">
-          <div className="max-w-md mx-auto">
-            <div className="flex items-start">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center w-8 h-8 bg-yellow-400 rounded-full">
-                  <span className="text-yellow-800 font-bold text-sm">!</span>
-                </div>
-              </div>
-              <div className="ml-3 flex-1">
-                <p className="text-sm font-medium text-yellow-800">
-                  Enhanced Data Model Available
-                </p>
-                <p className="text-xs text-yellow-700 mt-1">
-                  Upgrade to properly track sold positions and realized gains/losses
-                </p>
-                <div className="mt-3 flex space-x-2">
-                  <button 
-                    onClick={handleStartMigration}
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
-                  >
-                    Upgrade Now
-                  </button>
-                  <button 
-                    onClick={handleMigrationSkip}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm transition-colors"
-                  >
-                    Skip for Now
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Migration Tool Overlay */}
-      {migrationState === 'migrating' && (
-        <DataMigrationTool 
-          onComplete={handleMigrationComplete}
-          onCancel={() => setMigrationState('needed')}
-        />
-      )}
-      {/* ========== END MIGRATION COMPONENTS ========== */}
-
-      <ErrorBanner 
-        errorBanner={errorBanner} 
-        onCopyDetails={copyTechnicalDetails}
+      {/* Error Banner */}
+      <ErrorBanner
+        errorBanner={errorBanner}
         onClose={() => setErrorBanner(null)}
       />
       
-      <SideMenu 
-        isOpen={sideMenuOpen}
-        onClose={() => setSideMenuOpen(false)}
+      {/* Side Menu */}
+      <SideMenu
+        sideMenuOpen={sideMenuOpen}
+        setSideMenuOpen={setSideMenuOpen}
         activeWorkflow={activeWorkflow}
-        onWorkflowChange={setActiveWorkflow}
+        setActiveWorkflow={setActiveWorkflow}
+        setActiveTab={setActiveTab}
+        metrics={metrics}
+        formatCurrency={formatCurrency}
       />
       
       {/* Header */}
-      <div style={{
-        backgroundColor: '#2563eb', 
-        color: 'white', 
-        padding: '1rem',
-        // ========== UPDATE MARGIN-TOP TO ACCOUNT FOR MIGRATION BANNER ==========
-        marginTop: migrationState === 'needed' ? '80px' : errorBanner ? '60px' : '0'
-      }}>
+      <div 
+        className="bg-blue-600 text-white p-4"
+        style={{ marginTop: errorBanner ? '60px' : '0' }}
+      >
         <div className="flex items-center justify-between">
           <button
             onClick={() => setSideMenuOpen(true)}
             className="p-2 hover:bg-blue-700 rounded-lg transition-colors"
+            aria-label="Open menu"
           >
             <Menu size={20} />
           </button>
           
           <div className="text-center flex-1">
-            <h1 className="text-xl font-bold">Portfolio</h1>
-            <p className="text-sm opacity-90">
-              Total: {formatCurrency(metrics.totalPortfolioValueUSD, 'USD')}
-            </p>
+            <h1 className="text-xl font-bold">{getWorkflowTitle()}</h1>
+            {activeWorkflow === 'portfolio' && (
+              <>
+                <p className="text-sm opacity-90">
+                  Total: {formatCurrency(metrics.totalCurrentUSD, 'USD')}
+                </p>
+                <p className="text-xs opacity-75">
+                  1 CAD = ${cadToUsdRate.toFixed(4)} USD
+                </p>
+              </>
+            )}
           </div>
           
-          <CurrencyToggle 
+          <CurrencyToggle
             displayCurrency={displayCurrency}
-            onCurrencyChange={setDisplayCurrency}
+            onToggle={setDisplayCurrencyTo}
           />
         </div>
       </div>
 
-      {/* Content */}
+      {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
         {renderContent()}
       </div>
 
-      <Navigation 
+      {/* Bottom Navigation */}
+      <BottomNavigation
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        setActiveTab={setActiveTab}
         activeWorkflow={activeWorkflow}
       />
     </div>
   );
-}
+};
 
 export default App;
