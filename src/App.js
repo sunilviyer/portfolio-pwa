@@ -5,8 +5,8 @@ import SideMenu from './components/navigation/SideMenu';
 
 // STEP 2: Add these imports ONE BY ONE after Step 1 works
 import ErrorBanner from './components/common/ErrorBanner';
-// import CurrencyToggle from './components/common/CurrencyToggle';
-// import BottomNavigation from './components/navigation/BottomNavigation';
+import CurrencyToggle from './components/common/CurrencyToggle';
+import BottomNavigation from './components/navigation/BottomNavigation';
 
 // STEP 3: Add page imports ONE BY ONE
 // import DashboardPage from './pages/DashboardPage';
